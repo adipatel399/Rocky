@@ -1,91 +1,189 @@
-# J.A.R.V.I.S.
+<div align="center">
 
-A local, voice-controlled AI butler for your Mac — wake word, British voice,
-cinematic HUD with a live artifact panel, and real hands: its brain is a
-persistent, streaming Claude Code session.
+# 🤖 J.A.R.V.I.S.
 
+### Your own Just A Rather Very Intelligent System — running on your Mac, listening for your voice.
+
+*A local AI butler with a wake word, a British accent, a glowing HUD, and real hands on your computer.*
+
+</div>
+
+---
+
+## What is this, really?
+
+Tony Stark had Jarvis: a voice he could talk to like a person, who could see what he was looking at, control the workshop, pull up information on a holographic display, and just *get things done*.
+
+This project is a real, working version of that — built for your Mac. You say **"Jarvis,"** he wakes up, you talk to him like you'd talk to a person, and he can actually act: open apps, search the web, write files, check your system, build things, generate images, and show you the results on a glowing screen while he explains it out loud.
+
+Nothing here is cloud magic pretending to be local — it genuinely runs on your machine. The only thing that leaves your Mac is what he explicitly searches for or opens on your behalf.
+
+---
+
+## ✨ What he can actually do
+
+| | |
+|---|---|
+| 🎙️ **Wakes up when you say "Jarvis"** | No button, no app switch — just talk |
+| 💬 **Has real conversations** | You don't repeat "Jarvis" every sentence — once he's listening, he keeps listening |
+| ⚡ **Starts talking almost instantly** | He speaks the first part of his answer while still figuring out the rest |
+| 🖥️ **Controls your Mac** | Opens apps, plays music, adjusts volume, sends notifications, clicks and types |
+| 👀 **Sees your screen** | Ask "what am I looking at?" and he'll actually look |
+| 🌐 **Searches the web** | Real, current information — not just what he already knows |
+| 📊 **Shows you things, not just tells you** | Diagrams, tables, plans, and images appear on his display panel as he talks |
+| 🖼️ **Designs thumbnails and images** | Ask for a YouTube thumbnail and watch it appear on a numbered board |
+| 📝 **Remembers things for you** | "Note this down" and it's saved, browsable, and searchable later |
+| 🩺 **Runs diagnostics** | CPU, memory, disk, battery, and network health in one spoken summary |
+| 🧑‍🤝‍🧑 **Delegates work** | Splits big jobs across parallel helper agents — his own "Iron Legion" |
+| 🔁 **Sends prompts to ChatGPT or Claude** | Say it once, and he'll open the browser with your words already typed in |
+
+---
+
+## 🧠 How it's built (the short version)
+
+Everything runs as one background program on your Mac. The window you see is just a *screen* connected to it — closing the window doesn't turn Jarvis off, any more than turning off a monitor turns off the computer.
+
+```mermaid
+flowchart TB
+    subgraph You
+        V["🎙️ Your voice"]
+        T["⌨️ Or just type"]
+    end
+
+    subgraph Mac["Your Mac — everything below runs locally"]
+        Ears["👂 Ears<br/><small>wake-word + speech-to-text</small>"]
+        Brain["🧠 Brain<br/><small>a live Claude session, always warm</small>"]
+        Voice["🔊 Voice<br/><small>speaks as he thinks, sentence by sentence</small>"]
+        HUD["🖥️ HUD<br/><small>the glowing window you see</small>"]
+        Data["🗂️ His memory<br/><small>notes · diagrams · thumbnails</small>"]
+    end
+
+    Internet["🌐 The web<br/><small>only when he needs current info</small>"]
+
+    V --> Ears --> Brain
+    T --> Brain
+    Brain --> Voice
+    Brain --> HUD
+    Brain --> Data
+    Brain -. "searches / opens links" .-> Internet
+    Data --> HUD
 ```
-   your voice ──▶ ears (openWakeWord "jarvis" + Whisper — on-device)
-                     │
-   desktop app ──▶ core (FastAPI + WebSocket, streams everything)
-   `jarvis` cmd      │
-                     ▼
-                  brain (ONE persistent claude process, stream-json —
-                     │   replies stream out word by word)
-        ┌────────────┼──────────────┐
-        ▼            ▼              ▼
-   voice (Daniel, artifact panel  data/ (notes ·
-   speaks sentence  (markdown ·    records · thumbnail
-   by sentence as   mermaid ·      board — watched live)
-   text generates)  images)
-```
 
-## Launch
+**In plain English:**
+- **Ears** — always listening quietly for the word "Jarvis," using a tiny model that runs entirely offline. Once triggered, it records what you say and turns it into text — also fully offline.
+- **Brain** — this is Jarvis's mind. It's a real, persistent AI session that stays "warm" so it doesn't have to restart every time you talk to it. This is also what lets him actually *do* things, not just chat.
+- **Voice** — turns his reply into speech, and starts speaking the first sentence while the rest of the answer is still being formed — the same way a person starts talking before they've finished thinking of the whole sentence.
+- **HUD** — the glowing on-screen display. It shows the conversation, an animated reactor core that changes color depending on what he's doing, and a side panel where he can draw diagrams, show plans, and display images.
+- **His memory** — notes, records, and a thumbnail gallery that live in plain files on your Mac, so they survive restarts and you can open them yourself anytime.
+
+---
+
+## 🚀 Getting started
+
+**First time only:**
 
 ```bash
-jarvis          # starts the server if needed + opens the desktop window
-jarvis stop     # power down
-jarvis logs     # tail the server log
+cd ~/Downloads/Jarvis
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
-(`jarvis` is symlinked into `~/.local/bin`. The window is a chromeless Chrome
-app window — no tabs, no address bar, just the HUD.)
+**Every time after that:**
 
-## Talk to him
+```bash
+jarvis
+```
 
-- Say **"Jarvis"** → "Yes, sir?" → give your order. Keep talking within a few
-  seconds of his reply — no wake word needed (follow-up window).
-- He starts **speaking his first sentence while still thinking** — replies are
-  streamed from the brain into the speakers sentence by sentence.
-- "That's all" / "go to sleep" ends the exchange. `Esc` or STOP interrupts
-  mid-sentence. NEW starts a fresh conversation (context otherwise persists).
+That's it. This single command wakes him up (if he isn't already running) and opens his window — a clean, chromeless display with no browser tabs or address bar, just Jarvis.
 
-## What he can do
+| Command | What it does |
+|---|---|
+| `jarvis` | Open/reopen the Jarvis window |
+| `jarvis stop` | Actually power him down |
+| `jarvis logs` | Peek at what's happening under the hood |
 
-- **Anything Claude Code can**: shell, files, git, AppleScript app control,
-  web search, opening URLs. "Send this prompt to ChatGPT: …" opens
-  chatgpt.com with your spoken prompt pre-filled (same for Claude).
-- **Run diagnostics** — CPU, memory, disk, battery, network in one breath.
-- **See your screen** — "Jarvis, what am I looking at?" (screencapture + vision).
-- **Computer use** — clicking/typing/UI inspection via AppleScript System
-  Events (grant Accessibility permission to your terminal; optionally
-  `brew install cliclick` for pixel-precise clicks).
-- **Project to the HUD** — anything he writes into `data/artifacts/` renders
-  instantly on the panel: markdown (menus, plans, tables), `.mmd` Mermaid
-  diagrams, images. His "holographic display".
-- **Notes & records** — "note down…" writes markdown into `data/notes/`
-  (NOTES tab); records live under `data/records/`.
-- **YouTube thumbnail board** — "make me a thumbnail for…" renders a 1280×720
-  design via headless Chrome into `data/thumbnails/NNN-name.png`. Generations
-  are numbered and persistent; edits get a new number (BOARD tab).
-- **The Iron Legion** — parallel research/work via subagents.
+> 💡 **Closing the window doesn't turn him off** — it's just closing the curtains, not switching off the house. He keeps quietly listening in the background so you can walk back in and pick up the conversation. Say `jarvis stop` when you actually want him off.
 
-## Configure — `config.yaml`
+---
 
-| Key | What it does |
-|-----|--------------|
-| `title` | "sir" or "boss" |
-| `voice.name` / `voice.rate` | `say` voice + speed (Daniel = British male) |
-| `ears.wake_threshold` | Lower = easier wake, more false triggers |
-| `ears.whisper_model` | `tiny.en` fastest · `base.en` balanced · `small.en` sharpest |
-| `brain.model` | `null` = your Claude Code default · `haiku` = snappiest chat |
-| `brain.allowed_tools` | His hands — trim to restrict, extend to empower |
+## 🗣️ Talking to him
 
-### Full-power mode (think before enabling)
+```mermaid
+sequenceDiagram
+    participant You
+    participant Jarvis
 
-Default is `permission_mode: acceptEdits` + an explicit tool allowlist, and the
-persona confirms destructive actions aloud. `bypassPermissions` removes all
-friction — enable knowingly.
+    You->>Jarvis: "Jarvis"
+    Jarvis-->>You: "Yes, sir?"
+    You->>Jarvis: "Open Spotify and play something"
+    Jarvis-->>You: (starts speaking immediately, opens Spotify)
+    Note over You,Jarvis: no need to say "Jarvis" again —<br/>he's still listening
+    You->>Jarvis: "Turn it up a bit"
+    Jarvis-->>You: (adjusts volume, replies)
+    You->>Jarvis: "That's all"
+    Jarvis-->>You: "Very good, sir."
+    Note over Jarvis: back to quietly listening for his name
+```
 
-## Troubleshooting
+- Say **"Jarvis"** to start a conversation. After that, just keep talking — no need to repeat his name.
+- The conversation naturally ends after a few seconds of silence, or you can say **"that's all"**, **"go to sleep"**, or **"dismissed."**
+- Prefer typing? The window has a command bar too — everything works the same way.
+- `Esc` or the **STOP** button interrupts him mid-sentence. **NEW** starts a completely fresh conversation. **MUTE** makes him deaf without shutting him down (handy for privacy).
 
-- **EARS OFFLINE** — grant your terminal Microphone access, restart. Check
-  `curl localhost:8765/api/stats` for `ears_error`.
-- **Slow first reply after idle/interrupt** — first turn respawns the brain
-  process (context is restored via the session id); later turns are faster.
-- **Random wakes** — raise `ears.wake_threshold` to 0.6.
-- **"Session limit" replies** — your Claude plan's 5-hour usage window; it
-  resets on schedule. Voice chat burns usage like any Claude Code session.
+---
 
-First-time setup on a new machine: `python3 -m venv .venv &&
-.venv/bin/pip install -r requirements.txt`, then `bin/jarvis`.
+## 🖼️ His display panel — the "holographic display"
+
+Ask him for anything visual and it shows up live on the right-hand panel, while he explains it out loud.
+
+```mermaid
+flowchart LR
+    Ask(["🗣️ You ask for a diagram,<br/>a plan, or an image"])
+    Ask --> Brain["🧠 Jarvis builds it"]
+    Brain --> Panel{{"HUD Panel"}}
+    Panel --> MD["📄 Markdown<br/>plans · tables · menus"]
+    Panel --> Diagram["📊 Diagrams<br/>flowcharts, architecture"]
+    Panel --> Img["🖼️ Images<br/>generated or captured"]
+```
+
+He also keeps a running **thumbnail board** — ask "make me a thumbnail for my next video about X" and he'll design one, screenshot it, and add it to a numbered gallery you can browse (edits get a fresh number, so nothing is ever overwritten). And anything you ask him to remember gets written to a **notes tab** you can revisit any time — his version of a notebook.
+
+---
+
+## 🛠️ Making him yours — `config.yaml`
+
+Everything about how he sounds, listens, and behaves lives in one plain-English settings file. Open [`config.yaml`](config.yaml), tweak, save, and restart.
+
+| Setting | What it changes |
+|---|---|
+| `title` | What he calls you — "sir," "boss," anything |
+| `voice.name` | His voice — Daniel is a British male by default; run `say -v '?'` in Terminal to see every option on your Mac |
+| `voice.rate` | How fast he talks |
+| `ears.wake_threshold` | How easily he wakes up — lower if he's not hearing you, raise if he wakes up randomly |
+| `ears.mic_gain` | Boosts your mic volume before he processes it |
+| `ears.followup_seconds` | How long a conversation stays open after each reply before he goes back to sleep |
+| `brain.model` | Which AI model powers him — leave as-is for the best balance, or pick a faster/cheaper one |
+| `brain.allowed_tools` | What he's allowed to actually *do* — trim this list to hold him back, or leave it broad to let him act freely |
+
+> **A note on trust:** by default, Jarvis will ask before doing anything risky or irreversible, and confirms out loud what he's about to do. There's a "no training wheels" mode available in the config for total hands-off autonomy — only turn that on if you're comfortable with it.
+
+---
+
+## 🩹 Something not working?
+
+| Problem | Try this |
+|---|---|
+| **He's not hearing "Jarvis" at all** | Make sure your Terminal/app has Microphone permission (System Settings → Privacy & Security → Microphone) |
+| **You have to shout, or he only catches you sometimes** | Lower `wake_threshold` a little in `config.yaml`, or raise `mic_gain` |
+| **He wakes up randomly, or on background noise** | Raise `wake_threshold` back up |
+| **First reply after a pause feels slow** | Totally normal — he's waking his mind back up. Every reply after that is fast |
+| **He says he's hit a "session limit"** | That's a temporary usage cap on his AI plan, not a bug — it resets on its own after a few hours |
+| **Is he actually alive right now?** | Just say "Jarvis" — or run `curl localhost:8765/api/stats` in Terminal for a status check |
+
+---
+
+<div align="center">
+
+*"Sometimes you gotta run before you can walk."* — Tony Stark
+
+</div>
