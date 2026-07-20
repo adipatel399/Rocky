@@ -1,0 +1,35 @@
+#!/bin/zsh
+# JARVIS launcher — start the server (if needed) and open the desktop window.
+#   jarvis           → launch/focus the app window
+#   jarvis stop      → shut the server down
+#   jarvis logs      → tail the server log
+
+DIR="${0:A:h:h}"                       # project root (bin/..)
+URL="http://localhost:8765"
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+
+case "$1" in
+  stop)
+    pkill -f "python -m jarvis" && echo "JARVIS powered down." || echo "JARVIS wasn't running."
+    exit 0 ;;
+  logs)
+    exec tail -f "$DIR/data/jarvis.log" ;;
+esac
+
+if ! curl -s -o /dev/null --max-time 1 "$URL/api/stats"; then
+  echo "Waking JARVIS…"
+  cd "$DIR" || exit 1
+  mkdir -p data
+  nohup .venv/bin/python -m jarvis >> data/jarvis.log 2>&1 &
+  for i in {1..40}; do
+    curl -s -o /dev/null --max-time 1 "$URL/api/stats" && break
+    sleep 0.5
+  done
+fi
+
+if [[ -x "$CHROME" ]]; then
+  open -na "Google Chrome" --args --app="$URL" --window-size=1500,920
+else
+  open "$URL"
+fi
+echo "At your service, sir. → $URL"

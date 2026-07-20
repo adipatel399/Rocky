@@ -1,0 +1,21 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Claude Code / Tools
+.claude/
+CLAUDE.md
+claude.md
+
+# MacOS files
+.DS_Store
+
+# Jarvis runtime data
+data/

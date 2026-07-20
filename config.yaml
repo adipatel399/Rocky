@@ -1,0 +1,45 @@
+# ── JARVIS configuration ─────────────────────────────────────────────
+# Edit and restart. Anything omitted falls back to sensible defaults.
+
+title: "sir"          # how Jarvis addresses you: sir / boss
+port: 8765
+
+voice:
+  name: "Daniel"      # British male. Others: try `say -v '?'` (Oliver, Reed…)
+  rate: 178           # words per minute
+  enabled: true
+
+ears:
+  enabled: true
+  wake_threshold: 0.28    # tuned for saying just "Jarvis" (0.2 = hair-trigger,
+                          # 0.5 = must say "hey jarvis" clearly). While tuning,
+                          # watch `curl localhost:8765/api/stats` → wake_peak.
+  mic_gain: 1.5           # software mic boost; raise to 2–3 if he still misses you
+  followup_seconds: 8     # conversation mode: after each reply he keeps
+                          # listening this long — no wake word between turns
+  silence_seconds: 1.4    # pause length that ends your sentence
+  max_command_seconds: 14
+  whisper_model: "base.en"   # tiny.en = fastest · small.en = most accurate
+
+acknowledgements:
+  - "Yes, sir?"
+  - "At your service, sir."
+  - "Sir?"
+  - "How can I help, sir?"
+
+sleep_phrases:
+  ["go to sleep", "that's all", "thats all", "stand down", "dismissed",
+   "thank you jarvis", "goodnight jarvis"]
+
+brain:
+  command: "claude"
+  model: null              # null = your Claude Code default. "haiku" = snappiest
+                           # conversation; "sonnet"/"opus" = smarter, slower.
+  cwd: "~"                 # the directory Jarvis's hands operate from
+  permission_mode: "acceptEdits"
+  # Tools the headless Claude session may use without asking.
+  # This is what makes Jarvis able to *act*. Trim it to restrict him.
+  allowed_tools:
+    ["Bash", "Read", "Glob", "Grep", "Write", "Edit",
+     "WebSearch", "WebFetch", "TodoWrite", "Task"]
+  timeout_seconds: 600

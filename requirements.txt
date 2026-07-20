@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+websockets
+pyyaml
+# ── voice stack (all local) ──
+numpy
+sounddevice
+faster-whisper
+openwakeword
