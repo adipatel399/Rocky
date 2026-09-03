@@ -1,35 +1,50 @@
 #!/bin/zsh
-# JARVIS launcher — start the server (if needed) and open the desktop window.
-#   jarvis           → launch/focus the app window
-#   jarvis stop      → shut the server down
+# JARVIS launcher — the server lives and dies with this terminal.
+#   jarvis           → start the server in THIS terminal + open the window
+#                      (close the terminal or Ctrl+C to power him down)
+#   jarvis stop      → shut down a running server from anywhere
 #   jarvis logs      → tail the server log
 
-DIR="${0:A:h:h}"                       # project root (bin/..)
+DIR="$(cd "$(dirname "$0")/.." && pwd)"   # project root (bin/..)
 URL="http://localhost:8765"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
+open_window() {
+  if [[ -x "$CHROME" ]]; then
+    open -na "Google Chrome" --args --app="$URL" --window-size=1500,920
+  else
+    open "$URL"
+  fi
+}
+
 case "$1" in
   stop)
-    pkill -f "python -m jarvis" && echo "JARVIS powered down." || echo "JARVIS wasn't running."
+    PID=$(lsof -ti :8765 -sTCP:LISTEN)
+    if [[ -n "$PID" ]]; then
+      kill $PID && echo "JARVIS powered down."
+    else
+      echo "JARVIS wasn't running."
+    fi
     exit 0 ;;
   logs)
     exec tail -f "$DIR/data/jarvis.log" ;;
 esac
 
-if ! curl -s -o /dev/null --max-time 1 "$URL/api/stats"; then
-  echo "Waking JARVIS…"
-  cd "$DIR" || exit 1
-  mkdir -p data
-  nohup .venv/bin/python -m jarvis >> data/jarvis.log 2>&1 &
-  for i in {1..40}; do
-    curl -s -o /dev/null --max-time 1 "$URL/api/stats" && break
-    sleep 0.5
-  done
+# Already awake? Just bring up the window.
+if curl -s -o /dev/null --max-time 1 "$URL/api/stats"; then
+  echo "JARVIS is already awake — opening his window."
+  open_window
+  exit 0
 fi
 
-if [[ -x "$CHROME" ]]; then
-  open -na "Google Chrome" --args --app="$URL" --window-size=1500,920
-else
-  open "$URL"
-fi
-echo "At your service, sir. → $URL"
+cd "$DIR" || exit 1
+mkdir -p data
+
+# Open the window as soon as the server answers.
+( for i in {1..60}; do
+    curl -s -o /dev/null --max-time 1 "$URL/api/stats" && { open_window; exit 0; }
+    sleep 0.5
+  done ) &
+
+echo "JARVIS online. This terminal is his lifeline — close it (or Ctrl+C) to power him down."
+.venv/bin/python -m jarvis 2>&1 | tee -a data/jarvis.log

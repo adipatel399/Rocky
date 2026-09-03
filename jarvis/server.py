@@ -1,6 +1,7 @@
 """JARVIS server v2: streaming orchestration, WebSocket hub, HUD + data panels."""
 import asyncio
 import collections
+import json
 import os
 import time
 
@@ -9,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import config as config_mod
+from . import geo
 from .brain import Brain
 from .tts import Voice
 
@@ -18,10 +20,11 @@ ARTIFACTS_DIR = os.path.join(DATA_DIR, "artifacts")
 NOTES_DIR = os.path.join(DATA_DIR, "notes")
 BOARD_DIR = os.path.join(DATA_DIR, "thumbnails")
 RECORDS_DIR = os.path.join(DATA_DIR, "records")
+GLOBE_DIR = os.path.join(DATA_DIR, "globe")
 
 IMAGE_EXT = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg")
 
-for _d in (ARTIFACTS_DIR, NOTES_DIR, BOARD_DIR, RECORDS_DIR):
+for _d in (ARTIFACTS_DIR, NOTES_DIR, BOARD_DIR, RECORDS_DIR, GLOBE_DIR):
     os.makedirs(_d, exist_ok=True)
 
 
@@ -39,6 +42,7 @@ class JarvisCore:
         self.history = collections.deque(maxlen=120)
         self.current_task = None
         self.busy = False
+        self.last_globe = None
         self.started_at = time.time()
 
     # ---------- broadcasting ----------
@@ -84,31 +88,85 @@ class JarvisCore:
         self.current_task = asyncio.current_task()
         await self.post_message("user", text)
         await self.set_state("thinking")
-        await self.broadcast({"type": "stream_start"})
-
-        async def on_delta(fragment: str):
-            await self.broadcast({"type": "delta", "text": fragment})
-            await self.voice.feed(fragment)
-
-        async def on_activity(desc: str):
-            await self.broadcast({"type": "activity", "text": desc})
 
         try:
+            # --- Geospatial fast path: geocode + live data, no LLM round-trip.
+            if await self._try_geo(text):
+                return
+
+            await self.broadcast({"type": "stream_start"})
+
+            async def on_delta(fragment: str):
+                await self.broadcast({"type": "delta", "text": fragment})
+                await self.voice.feed(fragment)
+
+            async def on_activity(desc: str):
+                await self.broadcast({"type": "activity", "text": desc})
+
             reply = await self.brain.ask(text, on_delta=on_delta,
                                          on_activity=on_activity)
             await self.voice.flush()
+            await self.broadcast({"type": "stream_end"})
+            await self.post_message("jarvis", reply)
+            await self.voice.wait_idle()
+            await self.set_state("idle")
         except asyncio.CancelledError:
             self.voice.stop()
             await self.post_message("system", "Interrupted.")
-            return
         finally:
             self.busy = False
             self.current_task = None
 
-        await self.broadcast({"type": "stream_end"})
-        await self.post_message("jarvis", reply)
+    async def _try_geo(self, text: str) -> bool:
+        """Intel fast path: camera moves + data windows + UI actions, no LLM
+        round-trip. Returns True when handled."""
+        try:
+            result = await asyncio.to_thread(geo.resolve, text)
+        except Exception:
+            result = None
+        if not result:
+            return False
+        messages, spoken, deferred = result
+        for msg in messages:
+            await self.broadcast(msg)
+            if msg.get("type") == "globe":
+                self.last_globe = msg
+        await self.post_message("jarvis", spoken)
+        await self.set_state("speaking")
+        # Speak now; fetch heavy visuals (video, worldwide fly-to) in parallel
+        # so they land while Jarvis is still talking — no added latency.
+        speak_task = asyncio.ensure_future(self.voice.speak(spoken))
+        if deferred:
+            try:
+                await self._run_deferred(deferred)
+            except Exception:
+                pass
+        await speak_task
         await self.voice.wait_idle()
         await self.set_state("idle")
+        return True
+
+    async def _run_deferred(self, d: dict):
+        kind = d.get("type")
+        wid = d.get("window_id")
+        if kind == "worldwide":
+            loc = await asyncio.to_thread(geo.locate_headline, d["title"])
+            if loc:
+                cam = {"type": "globe", "action": "focus", "lat": loc["lat"],
+                       "lng": loc["lng"], "zoom": 1.9, "label": geo._label(loc)}
+                self.last_globe = cam
+                await self.broadcast(cam)
+                await self.broadcast({"type": "window_update", "id": wid,
+                                      "patch": {"title": geo._label(loc)}})
+            vid = await asyncio.to_thread(geo.youtube_search, d["video_query"])
+            if vid:
+                await self.broadcast({"type": "window_update", "id": wid,
+                                      "patch": {"video_id": vid}})
+        elif kind == "video":
+            vid = await asyncio.to_thread(geo.youtube_search, d["query"])
+            if vid:
+                await self.broadcast({"type": "window_update", "id": wid,
+                                      "patch": {"video_id": vid}})
 
     async def wake_test(self):
         import random
@@ -192,6 +250,25 @@ async def _watch_data():
             await core.broadcast({"type": "board", "items": _board_items()})
         if NOTES_DIR in touched:
             await core.broadcast({"type": "notes", "items": _note_items()})
+        for _, p in changes:
+            if os.path.dirname(p) == GLOBE_DIR and p.endswith(".json") and os.path.exists(p):
+                payload = _read_globe(p)
+                if payload:
+                    core.last_globe = payload
+                    await core.broadcast(payload)
+
+
+def _read_globe(path: str):
+    try:
+        with open(path, encoding="utf-8") as f:
+            payload = json.load(f)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    payload["type"] = "globe"
+    payload.setdefault("action", "focus")
+    return payload
 
 
 @app.on_event("startup")
@@ -233,6 +310,8 @@ async def ws_endpoint(ws: WebSocket):
     await ws.send_json(core.snapshot())
     await ws.send_json({"type": "board", "items": _board_items()})
     await ws.send_json({"type": "notes", "items": _note_items()})
+    if core.last_globe:
+        await ws.send_json(core.last_globe)
     try:
         while True:
             data = await ws.receive_json()
@@ -250,6 +329,10 @@ async def ws_endpoint(ws: WebSocket):
             elif mtype == "new_session":
                 core.brain.reset_session()
                 await core.post_message("system", "Fresh conversation started, sir.")
+            elif mtype == "open_url":
+                url = (data.get("url") or "").strip()
+                if url.startswith(("http://", "https://")):
+                    await asyncio.create_subprocess_exec("open", url)
             elif mtype == "open_note":
                 path = os.path.join(NOTES_DIR, os.path.basename(data.get("name", "")))
                 if os.path.isfile(path):

@@ -36,6 +36,7 @@ Nothing here is cloud magic pretending to be local — it genuinely runs on your
 | 🩺 **Runs diagnostics** | CPU, memory, disk, battery, and network health in one spoken summary |
 | 🧑‍🤝‍🧑 **Delegates work** | Splits big jobs across parallel helper agents — his own "Iron Legion" |
 | 🔁 **Sends prompts to ChatGPT or Claude** | Say it once, and he'll open the browser with your words already typed in |
+| 🌍 **Flies a 3D globe to your answer** | Ask about anywhere on Earth and a photoreal globe flies there, opening a live window — weather, news with video, or a knowledge card |
 
 ---
 
@@ -94,15 +95,16 @@ python3 -m venv .venv
 jarvis
 ```
 
-That's it. This single command wakes him up (if he isn't already running) and opens his window — a clean, chromeless display with no browser tabs or address bar, just Jarvis.
+That's it. This single command wakes him up in the current terminal and opens his window — a clean, chromeless display with no browser tabs or address bar, just Jarvis.
 
 | Command | What it does |
 |---|---|
-| `jarvis` | Open/reopen the Jarvis window |
-| `jarvis stop` | Actually power him down |
+| `jarvis` | Wake him up + open his window (reopens the window if he's already awake) |
+| `Ctrl+C` or close the terminal | Power him down |
+| `jarvis stop` | Power him down from any other terminal |
 | `jarvis logs` | Peek at what's happening under the hood |
 
-> 💡 **Closing the window doesn't turn him off** — it's just closing the curtains, not switching off the house. He keeps quietly listening in the background so you can walk back in and pick up the conversation. Say `jarvis stop` when you actually want him off.
+> 💡 **The terminal is his lifeline.** The terminal you launched him from shows his live activity log — close it (or press `Ctrl+C`) and he powers down completely, mic and all. Closing just the *display window* leaves him running; type `jarvis` again to bring the window back.
 
 ---
 
@@ -149,6 +151,60 @@ flowchart LR
 He also keeps a running **thumbnail board** — ask "make me a thumbnail for my next video about X" and he'll design one, screenshot it, and add it to a numbered gallery you can browse (edits get a fresh number, so nothing is ever overwritten). And anything you ask him to remember gets written to a **notes tab** you can revisit any time — his version of a notebook.
 
 ---
+
+## 🌍 The Geospatial Intelligence Layer — his holographic globe
+
+This is the showpiece. A photoreal Earth (blue-marble surface, drifting clouds,
+day/night terminator, star field) sits **always-on** at the center of the HUD.
+Ask Jarvis about anywhere on it and the globe flies to that spot and drops a
+live data card — the interface *moves to the answer*.
+
+```mermaid
+flowchart LR
+    Ask(["🗣️ 'weather in San Diego'<br/>'news from London'<br/>'take me to Tokyo'"])
+    Ask --> Intent["⚡ Instant intent match<br/><small>no LLM needed → sub-second</small>"]
+    Intent --> Geo["📍 Geocode + live data<br/><small>OpenStreetMap · Open-Meteo<br/>Google News · Wikipedia</small>"]
+    Geo --> Globe["🌐 Globe flies to the spot<br/><small>+ a live data window</small>"]
+```
+
+- **"What's the weather in San Diego?"** → the globe flies to California, drops a
+  pin, and opens a weather-app window: current conditions plus a **7-day
+  forecast** and humidity, wind, UV, pressure, sunrise/sunset, and local time.
+- **"Latest news worldwide"** → the Earth flies to the top story's location while
+  a window lists real, timestamped headlines with an **inline video** playing.
+- **"Show me news from London"** → flies to London and opens local headlines.
+- **"Who is Ada Lovelace?" / "tell me about the Eiffel Tower"** → flies to the
+  place and opens a knowledge window with an image and summary.
+- **"Take me to Tokyo"** → flies there with coordinates, country, and local time.
+
+Every window is **draggable and resizable** — say *"make it full screen"* and it
+fills the display, *"minimize it"* or *"close that"* to tidy up. He speaks the
+answer immediately; the heavier visuals (video, the fly-to for worldwide news)
+load in the background while he's talking, so replies stay snappy. Click any
+headline and it opens in your real browser.
+
+### How it works — three reusable primitives
+
+Jarvis's spatial interface isn't hardcoded per feature. It's built on three
+primitives, so new data sources are just "providers" that plug in:
+
+1. **Cinematic camera** — every location query runs the same choreography:
+   pull back → rotate across the globe → zoom into the target's exact coords.
+2. **Window manager** — every result is a floating window you can **drag,
+   resize, minimize, or maximize**. They open small; say *"make it full
+   screen"* and the window fills the display. Multiple windows coexist.
+3. **Intent → provider router** — one pipeline maps your words to a provider
+   and renders the result. Today's providers (all free, keyless, local):
+
+   | Say | Provider | You get |
+   |-----|----------|---------|
+   | "weather in Tokyo" | Open-Meteo | Fly-to + weather-app window |
+   | "news from London" / "latest news worldwide" | Google News + YouTube | Fly-to + **inline video** + headlines |
+   | "who is Ada Lovelace" / "tell me about the Eiffel Tower" | Wikipedia | Fly-to + knowledge card with image |
+   | "make it full screen" / "minimize" / "close that" | — | Voice control of the active window |
+
+   Adding a new source (flights, earthquakes, markets, sports) means writing one
+   provider function — the camera and windows already exist. That's the platform.
 
 ## 🛠️ Making him yours — `config.yaml`
 
