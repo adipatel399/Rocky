@@ -228,7 +228,7 @@ Everything about how he sounds, listens, and behaves lives in one plain-English 
 
 <div align="center">
 
-*"Good, good, good."* — Rocky 🪨
+*"Amaze, Amaze, Amaze."* — Rocky 🪨
 
 *Built for fun, out of love for Project Hail Mary.*
 
