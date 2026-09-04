@@ -1,4 +1,4 @@
-"""JARVIS server v2: streaming orchestration, WebSocket hub, HUD + data panels."""
+"""ROCKY server v2: streaming orchestration, WebSocket hub, HUD + data panels."""
 import asyncio
 import collections
 import json
@@ -28,7 +28,7 @@ for _d in (ARTIFACTS_DIR, NOTES_DIR, BOARD_DIR, RECORDS_DIR, GLOBE_DIR):
     os.makedirs(_d, exist_ok=True)
 
 
-class JarvisCore:
+class RockyCore:
     """Wires ears → brain → voice → HUD together, streaming end to end."""
 
     def __init__(self, cfg: dict):
@@ -81,7 +81,7 @@ class JarvisCore:
         if not text:
             return
         if self.busy:
-            await self.post_message("system", "Still working on the previous task, sir.")
+            await self.post_message("system", "I still work on last thing, friend.")
             return
 
         self.busy = True
@@ -107,7 +107,7 @@ class JarvisCore:
                                          on_activity=on_activity)
             await self.voice.flush()
             await self.broadcast({"type": "stream_end"})
-            await self.post_message("jarvis", reply)
+            await self.post_message("rocky", reply)
             await self.voice.wait_idle()
             await self.set_state("idle")
         except asyncio.CancelledError:
@@ -131,10 +131,10 @@ class JarvisCore:
             await self.broadcast(msg)
             if msg.get("type") == "globe":
                 self.last_globe = msg
-        await self.post_message("jarvis", spoken)
+        await self.post_message("rocky", spoken)
         await self.set_state("speaking")
         # Speak now; fetch heavy visuals (video, worldwide fly-to) in parallel
-        # so they land while Jarvis is still talking — no added latency.
+        # so they land while Rocky is still talking — no added latency.
         speak_task = asyncio.ensure_future(self.voice.speak(spoken))
         if deferred:
             try:
@@ -187,13 +187,29 @@ class JarvisCore:
             "state": self.state,
             "history": list(self.history),
             "ears": bool(self.ears and self.ears.ready and self.ears.is_alive()),
-            "voice": self.cfg["voice"]["name"],
+            "voice": self.cfg["voice"].get("name", "Rocko"),
+            "voice_label": self._voice_label(),
+            "voices": self.cfg.get("voice_options", []),
         }
+
+    def _voice_label(self) -> str:
+        name = self.cfg["voice"].get("name", "Rocko")
+        for label, vn in self.cfg.get("voice_options", []):
+            if vn == name:
+                return label.split(" · ")[0]
+        return name.split(" (")[0]
+
+    def set_voice(self, name: str) -> str:
+        """Switch the macOS `say` voice live. Returns the display label."""
+        valid = {vn for _, vn in self.cfg.get("voice_options", [])}
+        if name in valid:
+            self.cfg["voice"]["name"] = name
+        return self._voice_label()
 
 
 cfg = config_mod.load()
-core = JarvisCore(cfg)
-app = FastAPI(title="JARVIS")
+core = RockyCore(cfg)
+app = FastAPI(title="ROCKY")
 
 
 # ---------- data panels ----------
@@ -277,10 +293,10 @@ async def startup():
         try:
             _start_ears(asyncio.get_event_loop())
         except Exception as e:
-            print(f"[jarvis] ears disabled: {e}")
+            print(f"[rocky] ears disabled: {e}")
         asyncio.ensure_future(_watchdog())
     asyncio.ensure_future(_watch_data())
-    print(f"[jarvis] HUD → http://localhost:{cfg['port']}")
+    print(f"[rocky] HUD → http://localhost:{cfg['port']}")
 
 
 def _start_ears(loop):
@@ -298,7 +314,7 @@ async def _watchdog():
             try:
                 _start_ears(asyncio.get_event_loop())
             except Exception as e:
-                print(f"[jarvis] ears restart failed: {e}")
+                print(f"[rocky] ears restart failed: {e}")
 
 
 # ---------- websocket ----------
@@ -310,8 +326,6 @@ async def ws_endpoint(ws: WebSocket):
     await ws.send_json(core.snapshot())
     await ws.send_json({"type": "board", "items": _board_items()})
     await ws.send_json({"type": "notes", "items": _note_items()})
-    if core.last_globe:
-        await ws.send_json(core.last_globe)
     try:
         while True:
             data = await ws.receive_json()
@@ -326,9 +340,14 @@ async def ws_endpoint(ws: WebSocket):
                 core.ears.muted = bool(data.get("value"))
                 await core.post_message(
                     "system", "Ears muted." if core.ears.muted else "Ears live.")
+            elif mtype == "set_voice":
+                label = core.set_voice((data.get("name") or "").strip())
+                await core.broadcast({"type": "voice", "name": core.cfg["voice"]["name"],
+                                      "label": label})
+                asyncio.ensure_future(core.voice.speak("Good, good, good. This my voice now, friend."))
             elif mtype == "new_session":
                 core.brain.reset_session()
-                await core.post_message("system", "Fresh conversation started, sir.")
+                await core.post_message("system", "New talk. Clean mind, friend.")
             elif mtype == "open_url":
                 url = (data.get("url") or "").strip()
                 if url.startswith(("http://", "https://")):

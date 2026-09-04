@@ -43,7 +43,7 @@ WMO = {
 
 FILLER = re.compile(
     r"\b(right now|now|today|tonight|currently|at the moment|these days|please|"
-    r"jarvis|for me|the weather|weather|like|of|latest)\b", re.I)
+    r"rocky|jarvis|for me|the weather|weather|like|of|latest)\b", re.I)
 
 STOPWORDS = set("the a an and or of in on at to for from with as is are was were "
                 "breaking news update latest says say after before over under new "
@@ -95,7 +95,7 @@ def _geocode_nominatim(place: str):
         u = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
             {"q": place, "format": "json", "limit": 1,
              "addressdetails": 1, "accept-language": "en"})
-        req = urllib.request.Request(u, headers={"User-Agent": "JarvisAssistant/1.0 (personal use)"})
+        req = urllib.request.Request(u, headers={"User-Agent": "RockyAssistant/1.0 (personal use)"})
         with urllib.request.urlopen(req, timeout=6) as r:
             d = json.loads(r.read())
         if d:
@@ -376,8 +376,8 @@ def parse_intent(text: str):
 
 # ------------------------------------------------------------------ resolve
 
-UI_ACKS = {"fullscreen": "Expanding, sir.", "minimize": "Minimising, sir.",
-           "restore": "Restoring it, sir.", "close": "Closing that, sir."}
+UI_ACKS = {"fullscreen": "Make big, friend.", "minimize": "Make small, friend.",
+           "restore": "Back to normal, friend.", "close": "Close now, friend."}
 
 
 def resolve(text: str):
@@ -385,7 +385,7 @@ def resolve(text: str):
 
     `messages` are broadcast immediately (camera + windows the user sees at
     once). `deferred` (or None) describes heavy enrichment the server runs in
-    the background *while Jarvis is speaking* — the YouTube video and the
+    the background *while Rocky is speaking* — the YouTube video and the
     worldwide fly-to — so it never adds voice-to-voice latency."""
     intent = parse_intent(text)
     if not intent:
@@ -394,7 +394,7 @@ def resolve(text: str):
 
     if kind == "ui":
         return ([{"type": "ui", "action": intent["action"]}],
-                UI_ACKS.get(intent["action"], "Done, sir."), None)
+                UI_ACKS.get(intent["action"], "Done, friend."), None)
 
     if kind == "knowledge":
         w = wikipedia(intent["query"])
@@ -407,7 +407,7 @@ def resolve(text: str):
                          "lng": c["lon"], "zoom": 1.7, "label": w["title"]})
         msgs.append({"type": "window", "kind": "wiki", "title": w["title"],
                      "extract": w["extract"], "thumb": w["thumb"], "url": w["url"]})
-        spoken = w["extract"].split(". ")[0].strip() + "."
+        spoken = "Friend, I tell you. " + w["extract"].split(". ")[0].strip() + "."
         return msgs, spoken, None
 
     if kind == "news" and intent.get("global"):
@@ -421,7 +421,7 @@ def resolve(text: str):
                "items": items, "video_id": None}
         deferred = {"type": "worldwide", "window_id": wid, "title": top,
                     "video_query": top + " news"}
-        return [cam, win], f"Top story worldwide, sir. {top}.", deferred
+        return [cam, win], f"Big news, friend. {top}.", deferred
 
     if kind == "news":
         # Geocode and fetch headlines in parallel — neither needs the other.
@@ -440,7 +440,7 @@ def resolve(text: str):
                "items": items, "video_id": None}
         deferred = {"type": "video", "window_id": wid,
                     "query": f"{g['name']} {items[0]['title']}"}
-        return [cam, win], f"Latest from {g['name']}, sir. {items[0]['title']}.", deferred
+        return [cam, win], f"News from {g['name']}, friend. {items[0]['title']}.", deferred
 
     g = geocode(intent["place"]) if intent.get("place") else None
     if not g or g["lat"] is None:
@@ -456,8 +456,8 @@ def resolve(text: str):
         cam["zoom"] = 1.4
         win = {"type": "window", "kind": "weather", "title": label,
                "local_time": _local_time(w.get("timezone") or g.get("timezone")), **w}
-        spoken = (f"It's {w['temp']} degrees and {w['desc'].lower()} in "
-                  f"{g['name']}, sir, feeling like {w['feels']}.")
+        spoken = (f"Weather in {g['name']}, friend. {w['temp']} degree, "
+                  f"{w['desc'].lower()}. Feel like {w['feels']}.")
         return [cam, win], spoken, None
 
     if kind == "locate":
@@ -467,6 +467,6 @@ def resolve(text: str):
                "local_time": _local_time(g.get("timezone") or timezone_at(g["lat"], g["lng"])),
                "population": g.get("population"), "country": g.get("country")}
         lt = win["local_time"]
-        return ([cam, win], f"Here's {g['name']}, sir." + (f" It's {lt} there." if lt else ""), None)
+        return ([cam, win], f"Here is {g['name']}, friend." + (f" Time there {lt}." if lt else ""), None)
 
     return None

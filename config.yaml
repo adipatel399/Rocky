@@ -1,17 +1,34 @@
-# ── JARVIS configuration ─────────────────────────────────────────────
+# ── ROCKY configuration ──────────────────────────────────────────────
 # Edit and restart. Anything omitted falls back to sensible defaults.
 
-title: "sir"          # how Jarvis addresses you: sir / boss
-port: 8765
+title: "friend"       # how Rocky addresses you
 
 voice:
-  name: "Daniel"      # British male. Others: try `say -v '?'` (Oliver, Reed…)
-  rate: 178           # words per minute
   enabled: true
+  name: "Rocko (English (US))"   # macOS `say` voice — instant + offline.
+  rate: 180                       # words per minute. `say -v '?'` lists all.
+
+# Voices shown in the HUD dropdown: [label, `say` voice name].
+voice_options:
+  - ["Rocko",            "Rocko (English (US))"]
+  - ["Zarvox · alien",   "Zarvox"]
+  - ["Trinoids · choir", "Trinoids"]
+  - ["Cellos · musical", "Cellos"]
+  - ["Organ",            "Organ"]
+  - ["Boing",            "Boing"]
+  - ["Fred · robotic",   "Fred"]
+  - ["Daniel · British", "Daniel"]
+  - ["Rishi · Indian",   "Rishi"]
+  - ["Samantha · US",    "Samantha"]
+
+port: 8765
 
 ears:
   enabled: true
-  wake_threshold: 0.28    # tuned for saying just "Jarvis" (0.2 = hair-trigger,
+  wake_word: "rocky"      # say "Rocky" or "Hey Rocky" to wake him
+  wake_engine: "whisper"  # "whisper" = spot the wake word with speech-to-text
+                          # (works for any word); "openwakeword" = fast "Jarvis" model
+  wake_threshold: 0.28    # (openwakeword only) tuned for "Jarvis" (0.2 = hair-trigger,
                           # 0.5 = must say "hey jarvis" clearly). While tuning,
                           # watch `curl localhost:8765/api/stats` → wake_peak.
   mic_gain: 1.5           # software mic boost; raise to 2–3 if he still misses you
@@ -22,23 +39,23 @@ ears:
   whisper_model: "base.en"   # tiny.en = fastest · small.en = most accurate
 
 acknowledgements:
-  - "Yes, sir?"
-  - "At your service, sir."
-  - "Sir?"
-  - "How can I help, sir?"
+  - "Yes, friend?"
+  - "I here. Talk, friend."
+  - "I listen, friend."
+  - "Question, friend?"
 
 sleep_phrases:
   ["go to sleep", "that's all", "thats all", "stand down", "dismissed",
-   "thank you jarvis", "goodnight jarvis"]
+   "sleep now", "goodbye rocky", "bye rocky", "thank you rocky", "good night rocky"]
 
 brain:
   command: "claude"
   model: null              # null = your Claude Code default. "haiku" = snappiest
                            # conversation; "sonnet"/"opus" = smarter, slower.
-  cwd: "~"                 # the directory Jarvis's hands operate from
+  cwd: "~"                 # the directory Rocky's hands operate from
   permission_mode: "acceptEdits"
   # Tools the headless Claude session may use without asking.
-  # This is what makes Jarvis able to *act*. Trim it to restrict him.
+  # This is what makes Rocky able to *act*. Trim it to restrict him.
   allowed_tools:
     ["Bash", "Read", "Glob", "Grep", "Write", "Edit",
      "WebSearch", "WebFetch", "TodoWrite", "Task"]

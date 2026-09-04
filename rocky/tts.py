@@ -1,9 +1,9 @@
-"""JARVIS's voice v2: streaming sentence-by-sentence speech.
+"""ROCKY's voice: streaming, sentence-by-sentence macOS speech.
 
-Text deltas from the brain are fed into a buffer; every time a sentence
-completes it's queued and spoken immediately — Jarvis starts talking while the
-rest of the reply is still being generated. A worker task plays sentences
-sequentially through macOS `say` (Daniel, en_GB by default).
+Text deltas from the brain are buffered; each completed sentence is spoken the
+moment it forms, so Rocky starts talking while the rest of the reply is still
+generating. A worker task speaks sentences sequentially through macOS `say`
+(instant, offline). The voice is chosen live from the HUD dropdown.
 """
 import asyncio
 import re
@@ -16,7 +16,7 @@ SENTENCE_END = re.compile(r"(.*?[.!?…])(?:\s+|$)", re.DOTALL)
 
 
 def strip_for_speech(text: str) -> str:
-    text = CODE_BLOCK.sub(" — code on your screen, sir — ", text)
+    text = CODE_BLOCK.sub(" — code on your screen, friend — ", text)
     text = INLINE_CODE.sub(r"\1", text)
     text = LINK.sub(lambda m: m.group(1).split("/")[0], text)
     text = MD_NOISE.sub(" ", text)
@@ -88,7 +88,7 @@ class Voice:
                 if self.active >= 1 and self.on_start:
                     await self.on_start()
                 self.proc = await asyncio.create_subprocess_exec(
-                    "say", "-v", str(self.cfg.get("name", "Daniel")),
+                    "say", "-v", str(self.cfg.get("name", "Rocko (English (US))")),
                     "-r", str(self.cfg.get("rate", 180)),
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.DEVNULL,
@@ -118,7 +118,7 @@ class Voice:
         if not self.enabled or not clean:
             return
         subprocess.run(
-            ["say", "-v", str(self.cfg.get("name", "Daniel")),
+            ["say", "-v", str(self.cfg.get("name", "Rocko (English (US))")),
              "-r", str(self.cfg.get("rate", 180))],
             input=clean.encode("utf-8"),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -135,6 +135,8 @@ class Voice:
                 self.active -= 1
             except asyncio.QueueEmpty:
                 break
+        if self.active < 0:
+            self.active = 0
         self._kill_current()
 
     def _kill_current(self):

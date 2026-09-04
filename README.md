@@ -1,22 +1,22 @@
 <div align="center">
 
-# 🤖 J.A.R.V.I.S.
+# 🪨 ROCKY
 
-### Your own Just A Rather Very Intelligent System — running on your Mac, listening for your voice.
+### An Eridian engineer living in your Mac — wake him with your voice, and he *builds*, *controls*, and *talks back*.
 
-*A local AI butler with a wake word, a British accent, a glowing HUD, and real hands on your computer.*
+*A local, voice-controlled AI companion with a wake word, a rock-alien personality, a holographic globe, and real hands on your computer.*
 
 </div>
 
 ---
 
-## What is this, really?
+## Why this exists
 
-Tony Stark had Jarvis: a voice he could talk to like a person, who could see what he was looking at, control the workshop, pull up information on a holographic display, and just *get things done*.
+I watched **Project Hail Mary** and completely fell in love with **Rocky** — the five-legged, rock-bodied Eridian engineer who speaks in broken English, calls Ryland "friend," says *"good, good, good"* when he's happy and *"amaze!"* when something blows his mind. He's brave, brilliant, funny, and unbelievably loyal.
 
-This project is a real, working version of that — built for your Mac. You say **"Jarvis,"** he wakes up, you talk to him like you'd talk to a person, and he can actually act: open apps, search the web, write files, check your system, build things, generate images, and show you the results on a glowing screen while he explains it out loud.
+So, for fun, I built my own Rocky — a real, working AI assistant that lives on my Mac, talks exactly like him, and can actually *do things*. You say **"Rocky,"** he wakes up, you talk to him like a friend, and he acts: opens apps, searches the web, writes files, checks your system, flies a 3D globe to your answer, and shows you the results on a glowing screen while he explains it out loud — in Rocky's voice.
 
-Nothing here is cloud magic pretending to be local — it genuinely runs on your machine. The only thing that leaves your Mac is what he explicitly searches for or opens on your behalf.
+Nothing here is cloud magic pretending to be local — the wake word and speech-to-text genuinely run on your machine. The only thing that leaves your Mac is what he explicitly searches for or opens on your behalf.
 
 ---
 
@@ -24,25 +24,27 @@ Nothing here is cloud magic pretending to be local — it genuinely runs on your
 
 | | |
 |---|---|
-| 🎙️ **Wakes up when you say "Jarvis"** | No button, no app switch — just talk |
-| 💬 **Has real conversations** | You don't repeat "Jarvis" every sentence — once he's listening, he keeps listening |
-| ⚡ **Starts talking almost instantly** | He speaks the first part of his answer while still figuring out the rest |
-| 🖥️ **Controls your Mac** | Opens apps, plays music, adjusts volume, sends notifications, clicks and types |
+| 🎙️ **Wakes up when you say "Rocky"** | No button, no app switch — just talk. "Rocky, what's the weather in Tokyo" works in one breath |
+| 💬 **Talks like Rocky** | Broken English, warm, funny — "Yes, friend?", "good, good, good", "Fist me, friend" — but the actual answer stays clear and correct |
+| 🤩 **Reacts with wonder** | Tell him something new and he lights up: *"Amaze! Amaze, amaze! I not know this — you teach me good, good, good."* |
+| 🗣️ **Real conversations** | You don't repeat "Rocky" every sentence — once he's listening, he keeps listening |
+| ⚡ **Instant voice** | macOS voices, chosen live from a dropdown (default **Rocko**, his namesake) — zero lag |
+| 🖥️ **Controls your Mac** | Everything Siri does and more: reminders, alarms, timers, volume, screenshots, notes, calendar, music, app launch — and messages/calls (with a confirm first) |
 | 👀 **Sees your screen** | Ask "what am I looking at?" and he'll actually look |
 | 🌐 **Searches the web** | Real, current information — not just what he already knows |
-| 📊 **Shows you things, not just tells you** | Diagrams, tables, plans, and images appear on his display panel as he talks |
-| 🖼️ **Designs thumbnails and images** | Ask for a YouTube thumbnail and watch it appear on a numbered board |
-| 📝 **Remembers things for you** | "Note this down" and it's saved, browsable, and searchable later |
+| 📊 **Shows you things** | Diagrams, tables, plans, and images appear on his display panel as he talks |
+| 🖼️ **Designs thumbnails** | Ask for a YouTube thumbnail and watch it appear on a numbered board |
+| 📝 **Remembers things** | "Rocky, note this down" and it's saved, browsable, and searchable later |
 | 🩺 **Runs diagnostics** | CPU, memory, disk, battery, and network health in one spoken summary |
-| 🧑‍🤝‍🧑 **Delegates work** | Splits big jobs across parallel helper agents — his own "Iron Legion" |
-| 🔁 **Sends prompts to ChatGPT or Claude** | Say it once, and he'll open the browser with your words already typed in |
 | 🌍 **Flies a 3D globe to your answer** | Ask about anywhere on Earth and a photoreal globe flies there, opening a live window — weather, news with video, or a knowledge card |
+
+And floating over the globe: a little **rock-bodied Rocky** you can drag to spin, poke to make him bounce, and who leans toward your cursor. 🪨✌️
 
 ---
 
 ## 🧠 How it's built (the short version)
 
-Everything runs as one background program on your Mac. The window you see is just a *screen* connected to it — closing the window doesn't turn Jarvis off, any more than turning off a monitor turns off the computer.
+Everything runs as one background program on your Mac. The window you see is just a *screen* connected to it — closing the window doesn't turn Rocky off, any more than turning off a monitor turns off the computer.
 
 ```mermaid
 flowchart TB
@@ -54,8 +56,8 @@ flowchart TB
     subgraph Mac["Your Mac — everything below runs locally"]
         Ears["👂 Ears<br/><small>wake-word + speech-to-text</small>"]
         Brain["🧠 Brain<br/><small>a live Claude session, always warm</small>"]
-        Voice["🔊 Voice<br/><small>speaks as he thinks, sentence by sentence</small>"]
-        HUD["🖥️ HUD<br/><small>the glowing window you see</small>"]
+        Voice["🔊 Voice<br/><small>macOS speech, sentence by sentence</small>"]
+        HUD["🖥️ HUD<br/><small>the glowing window + globe</small>"]
         Data["🗂️ His memory<br/><small>notes · diagrams · thumbnails</small>"]
     end
 
@@ -71,11 +73,11 @@ flowchart TB
 ```
 
 **In plain English:**
-- **Ears** — always listening quietly for the word "Jarvis," using a tiny model that runs entirely offline. Once triggered, it records what you say and turns it into text — also fully offline.
-- **Brain** — this is Jarvis's mind. It's a real, persistent AI session that stays "warm" so it doesn't have to restart every time you talk to it. This is also what lets him actually *do* things, not just chat.
-- **Voice** — turns his reply into speech, and starts speaking the first sentence while the rest of the answer is still being formed — the same way a person starts talking before they've finished thinking of the whole sentence.
-- **HUD** — the glowing on-screen display. It shows the conversation, an animated reactor core that changes color depending on what he's doing, and a side panel where he can draw diagrams, show plans, and display images.
-- **His memory** — notes, records, and a thumbnail gallery that live in plain files on your Mac, so they survive restarts and you can open them yourself anytime.
+- **Ears** — always listening quietly for "Rocky," transcribing offline with Whisper and only waking on a match. Say the wake word and the rest of your sentence in one go — he splits off the command automatically.
+- **Brain** — Rocky's mind: a real, persistent AI session that stays "warm" so it doesn't restart every time you talk. This is what lets him actually *do* things, not just chat.
+- **Voice** — macOS `say`, streamed sentence-by-sentence so he starts talking while still thinking. Pick any installed voice live from the HUD dropdown.
+- **HUD** — the glowing display: the conversation, an always-on photoreal globe, the little Rocky floating in the corner, and a side panel for diagrams, plans, and images.
+- **His memory** — notes, records, and a thumbnail gallery in plain files on your Mac, so they survive restarts and you can open them yourself anytime.
 
 ---
 
@@ -84,7 +86,7 @@ flowchart TB
 **First time only:**
 
 ```bash
-cd ~/Downloads/Jarvis
+cd ~/Downloads/Rocky
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
@@ -92,19 +94,19 @@ python3 -m venv .venv
 **Every time after that:**
 
 ```bash
-jarvis
+rocky
 ```
 
-That's it. This single command wakes him up in the current terminal and opens his window — a clean, chromeless display with no browser tabs or address bar, just Jarvis.
+That's it. This single command wakes him up in the current terminal and opens his window — a clean, chromeless display with no browser tabs or address bar, just Rocky.
 
 | Command | What it does |
 |---|---|
-| `jarvis` | Wake him up + open his window (reopens the window if he's already awake) |
+| `rocky` | Wake him up + open his window (reopens the window if he's already awake) |
 | `Ctrl+C` or close the terminal | Power him down |
-| `jarvis stop` | Power him down from any other terminal |
-| `jarvis logs` | Peek at what's happening under the hood |
+| `rocky stop` | Power him down from any other terminal |
+| `rocky logs` | Peek at what's happening under the hood |
 
-> 💡 **The terminal is his lifeline.** The terminal you launched him from shows his live activity log — close it (or press `Ctrl+C`) and he powers down completely, mic and all. Closing just the *display window* leaves him running; type `jarvis` again to bring the window back.
+> 💡 **The terminal is his lifeline.** The terminal you launched him from shows his live activity log — close it (or press `Ctrl+C`) and he powers down completely, mic and all. Closing just the *display window* leaves him running; type `rocky` again to bring it back.
 
 ---
 
@@ -113,51 +115,48 @@ That's it. This single command wakes him up in the current terminal and opens hi
 ```mermaid
 sequenceDiagram
     participant You
-    participant Jarvis
+    participant Rocky
 
-    You->>Jarvis: "Jarvis"
-    Jarvis-->>You: "Yes, sir?"
-    You->>Jarvis: "Open Spotify and play something"
-    Jarvis-->>You: (starts speaking immediately, opens Spotify)
-    Note over You,Jarvis: no need to say "Jarvis" again —<br/>he's still listening
-    You->>Jarvis: "Turn it up a bit"
-    Jarvis-->>You: (adjusts volume, replies)
-    You->>Jarvis: "That's all"
-    Jarvis-->>You: "Very good, sir."
-    Note over Jarvis: back to quietly listening for his name
+    You->>Rocky: "Rocky"
+    Rocky-->>You: "Yes, friend?"
+    You->>Rocky: "Open Spotify and play something"
+    Rocky-->>You: (starts speaking immediately, opens Spotify)
+    Note over You,Rocky: no need to say "Rocky" again —<br/>he's still listening
+    You->>Rocky: "Turn it up a bit"
+    Rocky-->>You: "Good, good, good." (adjusts volume)
+    You->>Rocky: "That's all"
+    Rocky-->>You: "Good. Sleep now, friend."
+    Note over Rocky: back to quietly listening for his name
 ```
 
-- Say **"Jarvis"** to start a conversation. After that, just keep talking — no need to repeat his name.
-- The conversation naturally ends after a few seconds of silence, or you can say **"that's all"**, **"go to sleep"**, or **"dismissed."**
+- Say **"Rocky"** (or "Hey Rocky") to start. After that, just keep talking — no need to repeat his name.
+- The conversation ends after a few seconds of silence, or say **"that's all"**, **"sleep now"**, or **"goodbye Rocky."**
 - Prefer typing? The window has a command bar too — everything works the same way.
-- `Esc` or the **STOP** button interrupts him mid-sentence. **NEW** starts a completely fresh conversation. **MUTE** makes him deaf without shutting him down (handy for privacy).
+- `Esc` / **STOP** interrupts him mid-sentence. **NEW** starts a fresh conversation. **MUTE** makes him deaf without shutting him down.
 
 ---
 
-## 🖼️ His display panel — the "holographic display"
+## 🖼️ His display panel
 
-Ask him for anything visual and it shows up live on the right-hand panel, while he explains it out loud.
+Ask him for anything visual and it shows up live on the right-hand panel while he explains it out loud.
 
 ```mermaid
 flowchart LR
     Ask(["🗣️ You ask for a diagram,<br/>a plan, or an image"])
-    Ask --> Brain["🧠 Jarvis builds it"]
+    Ask --> Brain["🧠 Rocky builds it"]
     Brain --> Panel{{"HUD Panel"}}
     Panel --> MD["📄 Markdown<br/>plans · tables · menus"]
     Panel --> Diagram["📊 Diagrams<br/>flowcharts, architecture"]
     Panel --> Img["🖼️ Images<br/>generated or captured"]
 ```
 
-He also keeps a running **thumbnail board** — ask "make me a thumbnail for my next video about X" and he'll design one, screenshot it, and add it to a numbered gallery you can browse (edits get a fresh number, so nothing is ever overwritten). And anything you ask him to remember gets written to a **notes tab** you can revisit any time — his version of a notebook.
+He keeps a running **thumbnail board** — ask "Rocky, make me a thumbnail for my next video about X" and he'll design one, screenshot it, and add it to a numbered gallery (edits get a fresh number, so nothing is overwritten). Anything you ask him to remember goes to a **notes tab** you can revisit anytime.
 
 ---
 
-## 🌍 The Geospatial Intelligence Layer — his holographic globe
+## 🌍 The holographic globe
 
-This is the showpiece. A photoreal Earth (blue-marble surface, drifting clouds,
-day/night terminator, star field) sits **always-on** at the center of the HUD.
-Ask Jarvis about anywhere on it and the globe flies to that spot and drops a
-live data card — the interface *moves to the answer*.
+The showpiece. A photoreal Earth (blue-marble surface, drifting clouds, day/night terminator, star field) sits **always-on** at the center of the HUD, with the pink **Petrova Line** from the film glowing in the background. Ask Rocky about anywhere and the globe flies there and drops a live data card — the interface *moves to the answer*.
 
 ```mermaid
 flowchart LR
@@ -167,44 +166,32 @@ flowchart LR
     Geo --> Globe["🌐 Globe flies to the spot<br/><small>+ a live data window</small>"]
 ```
 
-- **"What's the weather in San Diego?"** → the globe flies to California, drops a
-  pin, and opens a weather-app window: current conditions plus a **7-day
-  forecast** and humidity, wind, UV, pressure, sunrise/sunset, and local time.
-- **"Latest news worldwide"** → the Earth flies to the top story's location while
-  a window lists real, timestamped headlines with an **inline video** playing.
+- **"What's the weather in San Diego?"** → flies to California, drops a pin, opens a weather window: current conditions plus a **7-day forecast**, humidity, wind, UV, pressure, sunrise/sunset, and local time.
+- **"Latest news worldwide"** → flies to the top story's location while a window lists real, timestamped headlines with an **inline video** playing.
 - **"Show me news from London"** → flies to London and opens local headlines.
-- **"Who is Ada Lovelace?" / "tell me about the Eiffel Tower"** → flies to the
-  place and opens a knowledge window with an image and summary.
+- **"Who is Ada Lovelace?" / "tell me about the Eiffel Tower"** → flies to the place and opens a knowledge window with an image and summary.
 - **"Take me to Tokyo"** → flies there with coordinates, country, and local time.
 
-Every window is **draggable and resizable** — say *"make it full screen"* and it
-fills the display, *"minimize it"* or *"close that"* to tidy up. He speaks the
-answer immediately; the heavier visuals (video, the fly-to for worldwide news)
-load in the background while he's talking, so replies stay snappy. Click any
-headline and it opens in your real browser.
+Every window is **draggable and resizable** — say *"make it full screen"*, *"minimize it"*, or *"close that."* He speaks the answer immediately; heavier visuals (video, worldwide fly-to) load in the background so replies stay snappy. Click any headline and it opens in your real browser.
 
 ### How it works — three reusable primitives
 
-Jarvis's spatial interface isn't hardcoded per feature. It's built on three
-primitives, so new data sources are just "providers" that plug in:
+Rocky's spatial interface isn't hardcoded per feature. It's built on three primitives, so new data sources are just "providers" that plug in:
 
-1. **Cinematic camera** — every location query runs the same choreography:
-   pull back → rotate across the globe → zoom into the target's exact coords.
-2. **Window manager** — every result is a floating window you can **drag,
-   resize, minimize, or maximize**. They open small; say *"make it full
-   screen"* and the window fills the display. Multiple windows coexist.
-3. **Intent → provider router** — one pipeline maps your words to a provider
-   and renders the result. Today's providers (all free, keyless, local):
+1. **Cinematic camera** — every location query runs the same choreography: pull back → rotate across the globe → zoom into the target's exact coords.
+2. **Window manager** — every result is a floating window you can **drag, resize, minimize, or maximize**. They open small and coexist.
+3. **Intent → provider router** — one pipeline maps your words to a provider and renders the result. Today's providers (all free, keyless, local):
 
    | Say | Provider | You get |
    |-----|----------|---------|
-   | "weather in Tokyo" | Open-Meteo | Fly-to + weather-app window |
+   | "weather in Tokyo" | Open-Meteo | Fly-to + weather window |
    | "news from London" / "latest news worldwide" | Google News + YouTube | Fly-to + **inline video** + headlines |
-   | "who is Ada Lovelace" / "tell me about the Eiffel Tower" | Wikipedia | Fly-to + knowledge card with image |
+   | "who is Ada Lovelace" | Wikipedia | Fly-to + knowledge card with image |
    | "make it full screen" / "minimize" / "close that" | — | Voice control of the active window |
 
-   Adding a new source (flights, earthquakes, markets, sports) means writing one
-   provider function — the camera and windows already exist. That's the platform.
+   Adding a new source (flights, earthquakes, markets) means writing one provider function — the camera and windows already exist.
+
+---
 
 ## 🛠️ Making him yours — `config.yaml`
 
@@ -212,16 +199,17 @@ Everything about how he sounds, listens, and behaves lives in one plain-English 
 
 | Setting | What it changes |
 |---|---|
-| `title` | What he calls you — "sir," "boss," anything |
-| `voice.name` | His voice — Daniel is a British male by default; run `say -v '?'` in Terminal to see every option on your Mac |
+| `title` | What he calls you — default "friend" |
+| `voice.name` | His macOS voice (default **Rocko**). Run `say -v '?'` in Terminal for every option, or pick live from the HUD dropdown |
 | `voice.rate` | How fast he talks |
-| `ears.wake_threshold` | How easily he wakes up — lower if he's not hearing you, raise if he wakes up randomly |
-| `ears.mic_gain` | Boosts your mic volume before he processes it |
-| `ears.followup_seconds` | How long a conversation stays open after each reply before he goes back to sleep |
-| `brain.model` | Which AI model powers him — leave as-is for the best balance, or pick a faster/cheaper one |
-| `brain.allowed_tools` | What he's allowed to actually *do* — trim this list to hold him back, or leave it broad to let him act freely |
+| `voice_options` | The list of voices shown in the HUD dropdown |
+| `ears.wake_word` | The word that wakes him (default "rocky") |
+| `ears.mic_gain` | Boosts your mic before he processes it |
+| `ears.followup_seconds` | How long a conversation stays open after each reply |
+| `brain.model` | Which AI model powers him |
+| `brain.allowed_tools` | What he's allowed to actually *do* — trim to hold him back, leave broad to let him act freely |
 
-> **A note on trust:** by default, Jarvis will ask before doing anything risky or irreversible, and confirms out loud what he's about to do. There's a "no training wheels" mode available in the config for total hands-off autonomy — only turn that on if you're comfortable with it.
+> **A note on trust:** by default, Rocky asks before anything risky or irreversible (sending a message, calling someone, deleting, spending money) and says out loud what he's about to do. Some Mac actions (Reminders, Messages, screenshots) trigger a one-time macOS permission prompt the first time — that's your approval, not a bug.
 
 ---
 
@@ -229,17 +217,19 @@ Everything about how he sounds, listens, and behaves lives in one plain-English 
 
 | Problem | Try this |
 |---|---|
-| **He's not hearing "Jarvis" at all** | Make sure your Terminal/app has Microphone permission (System Settings → Privacy & Security → Microphone) |
-| **You have to shout, or he only catches you sometimes** | Lower `wake_threshold` a little in `config.yaml`, or raise `mic_gain` |
-| **He wakes up randomly, or on background noise** | Raise `wake_threshold` back up |
-| **First reply after a pause feels slow** | Totally normal — he's waking his mind back up. Every reply after that is fast |
-| **He says he's hit a "session limit"** | That's a temporary usage cap on his AI plan, not a bug — it resets on its own after a few hours |
-| **Is he actually alive right now?** | Just say "Jarvis" — or run `curl localhost:8765/api/stats` in Terminal for a status check |
+| **He's not hearing "Rocky"** | Make sure your Terminal/app has Microphone permission (System Settings → Privacy & Security → Microphone) |
+| **He only catches you sometimes** | Raise `mic_gain` in `config.yaml`, or speak the wake word a touch clearer |
+| **A Mac action does nothing** | The first use of Reminders/Messages/screenshots needs a one-time macOS permission — approve the prompt |
+| **First reply after a pause feels slow** | Normal — he's waking his mind back up. Replies after that are fast |
+| **He says he's hit a "session limit"** | A temporary usage cap on his AI plan, not a bug — it resets on its own |
+| **Is he alive right now?** | Say "Rocky" — or run `curl localhost:8765/api/stats` in Terminal |
 
 ---
 
 <div align="center">
 
-*"Sometimes you gotta run before you can walk."* — Tony Stark
+*"Good, good, good."* — Rocky 🪨
+
+*Built for fun, out of love for Project Hail Mary.*
 
 </div>

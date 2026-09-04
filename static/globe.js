@@ -1,4 +1,4 @@
-/* JARVIS globe — realistic, always-on Earth (globe.gl + three.js).
+/* ROCKY globe — realistic, always-on Earth (globe.gl + three.js).
    Photoreal blue-marble surface, topographic bump, drifting cloud layer, star
    field, and a fly-to Geospatial Intelligence Layer with live data cards. */
 "use strict";
@@ -22,7 +22,6 @@ const GlobeStage = (() => {
 
     world = Globe()(canvas)
       .backgroundColor("rgba(0,0,0,0)")
-      .backgroundImageUrl(IMG + "night-sky.png")
       .globeImageUrl(IMG + "earth-blue-marble.jpg")
       .bumpImageUrl(IMG + "earth-topology.png")
       .showAtmosphere(true)

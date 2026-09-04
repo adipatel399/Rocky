@@ -1,6 +1,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS</title>
+<title>ROCKY</title>
 <script src="/static/vendor/marked.min.js"></script>
 <script src="/static/vendor/mermaid.min.js"></script>
 <script src="/static/vendor/three.min.js"></script>
@@ -26,7 +26,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { height: 100%; overflow: hidden; }
   body {
-    background: var(--bg);
+    background:
+      radial-gradient(ellipse 90% 80% at 50% 45%, rgba(20,14,8,.35), rgba(4,4,7,.9) 80%),
+      url("/static/vendor/img/night-sky.png") center/cover no-repeat,
+      var(--bg);
     color: var(--text);
     font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
   }
@@ -34,9 +37,27 @@
   ::-webkit-scrollbar-thumb { background: var(--ice-dim); border-radius: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
 
-  /* ---------- globe background (always on) ---------- */
-  #globe-bg { position: fixed; inset: 0; z-index: 0; }
+  /* ---------- Petrova line (background phenomenon from the film) ---------- */
+  #petrova { position: fixed; inset: 0; z-index: 0; pointer-events: none; opacity: .8; }
+
+  /* ---------- globe (always-on centerpiece) ---------- */
+  #globe-bg { position: fixed; inset: 0; z-index: 1; }
   #globe-canvas { position: absolute; inset: 0; }
+
+  /* ---------- Rocky, floating & playable at the top-right of the globe ---------- */
+  /* floats in the open space over the globe's upper-right, just left of the
+     right dock (which is ~380px wide, pinned to the right edge). */
+  #rocky-corner { position: fixed; right: 432px; top: 84px; width: 216px; height: 216px;
+    z-index: 12; pointer-events: auto; cursor: grab;
+    filter: drop-shadow(0 6px 22px rgba(0,0,0,.7)); touch-action: none; }
+  #rocky-corner.dragging { cursor: grabbing; }
+  #rocky-corner canvas { width: 100%; height: 100%; display: block; }
+  #rocky-tag { position: fixed; right: 432px; top: 300px; width: 216px; text-align: center;
+    z-index: 12; font-size: .52rem; letter-spacing: .34em; color: var(--gold-2); pointer-events: none;
+    text-shadow: 0 0 10px var(--gold-glow); transition: opacity .3s; }
+  /* on narrower screens the dock stacks away — tuck Rocky to the far corner */
+  @media (max-width: 1320px) { #rocky-corner, #rocky-tag { right: 24px; } }
+  @media (max-width: 1080px) { #rocky-corner, #rocky-tag { display: none; } }
   #globe-label {
     position: fixed; left: 366px; bottom: 118px; z-index: 6;
     font-size: .95rem; letter-spacing: .3em; color: var(--gold-2);
@@ -64,6 +85,12 @@
   #chips .chip .k { color: var(--dim); }
   #chips .chip .v { color: var(--ice); margin-left: 7px; }
   #chips .chip .v.off { color: var(--danger); }
+  #voice-select { margin-left: 7px; background: rgba(255,255,255,.04);
+    color: var(--gold-2); border: 1px solid rgba(212,175,110,.35); border-radius: 5px;
+    font: inherit; letter-spacing: .12em; padding: 2px 6px; cursor: pointer;
+    outline: none; text-transform: uppercase; }
+  #voice-select:hover { border-color: var(--gold); }
+  #voice-select option { background: #12100c; color: var(--ice); text-transform: none; }
   #dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%;
     background: var(--danger); margin-right: 6px; box-shadow: 0 0 8px currentColor; }
   #dot.on { background: var(--ice); }
@@ -97,9 +124,9 @@
   .msg .who { letter-spacing: .16em; font-size: .58rem; display: block; margin-bottom: 3px; }
   .msg.user .who { color: var(--dim); }
   .msg.user .body { color: #fff8ec; }
-  .msg.jarvis .who { color: var(--gold); }
-  .msg.jarvis .body { color: var(--text); }
-  .msg.jarvis.live .body::after { content: "▋"; color: var(--gold);
+  .msg.rocky .who { color: var(--gold); }
+  .msg.rocky .body { color: var(--text); }
+  .msg.rocky.live .body::after { content: "▋"; color: var(--gold);
     animation: blink 1s steps(1) infinite; }
   @keyframes blink { 50% { opacity: 0; } }
   .msg.system { font-size: .64rem; color: var(--dim); font-style: italic; }
@@ -285,17 +312,37 @@
   @media (max-width: 820px) { #dock-left { display: none; } #chips { display: none; } #console { width: 90vw; } }
 </style>
 
+<svg id="petrova" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="pglow" x="-60%" y="-60%" width="220%" height="220%"><feGaussianBlur stdDeviation="7"/></filter>
+    <radialGradient id="sunG" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fff0c0"/><stop offset="35%" stop-color="#ff8a4a"/>
+      <stop offset="100%" stop-color="rgba(255,79,163,0)"/>
+    </radialGradient>
+  </defs>
+  <circle cx="80" cy="970" r="380" fill="url(#sunG)" opacity="0.45"/>
+  <path d="M110,985 C150,560 150,430 320,300 C520,150 720,150 910,80" fill="none"
+        stroke="#ff5fb0" stroke-width="11" filter="url(#pglow)" opacity="0.5"/>
+  <path d="M110,985 C150,560 150,430 320,300 C520,150 720,150 910,80" fill="none"
+        stroke="#ffc7e8" stroke-width="2.5" opacity="0.8"/>
+  <g fill="#ff77c8" filter="url(#pglow)">
+    <circle cx="150" cy="620" r="4"/><circle cx="205" cy="470" r="3"/><circle cx="300" cy="330" r="4"/>
+    <circle cx="470" cy="215" r="3"/><circle cx="650" cy="165" r="4"/><circle cx="830" cy="115" r="3"/>
+  </g>
+</svg>
 <div id="globe-bg"><div id="globe-canvas"></div></div>
 <div id="globe-label"></div>
+<div id="rocky-corner"><canvas id="rocky-corner-canvas"></canvas></div>
+<div id="rocky-tag">ROCKY · ERIDIAN</div>
 <div id="vignette"></div>
 <div id="grain"></div>
 
 <header>
-  <div class="brand"><h1>JARVIS</h1><span class="sub">MARK II</span></div>
+  <div class="brand"><h1>ROCKY</h1><span class="sub">ERIDIAN · 40 ERIDANI</span></div>
   <div id="chips">
     <span class="chip"><span class="k">LINK</span><span class="v"><span id="dot"></span><span id="link-txt">OFFLINE</span></span></span>
     <span class="chip"><span class="k">EARS</span><span class="v off" id="t-ears">—</span></span>
-    <span class="chip"><span class="k">VOICE</span><span class="v" id="t-voice">—</span></span>
+    <span class="chip chip-voice"><span class="k">VOICE</span><select id="voice-select" title="Pick Rocky's voice"></select></span>
     <span class="chip"><span class="k">LOAD</span><span class="v" id="t-load">—</span></span>
   </div>
   <div id="clock">--:--:--</div>
@@ -316,19 +363,19 @@
   <div class="pane on" id="pane-view">
     <div class="empty">◆<br>INTEL PANEL<br><span style="font-size:.58rem">markdown · diagrams · images appear here</span></div>
   </div>
-  <div class="pane" id="pane-board"><div class="pane-hint">no thumbnails yet<br>“jarvis, make me a thumbnail for…”</div></div>
-  <div class="pane" id="pane-notes"><div class="pane-hint">no notes yet<br>“jarvis, note down…”</div></div>
+  <div class="pane" id="pane-board"><div class="pane-hint">no thumbnails yet<br>“rocky, make me a thumbnail for…”</div></div>
+  <div class="pane" id="pane-notes"><div class="pane-hint">no notes yet<br>“rocky, note down…”</div></div>
 </div>
 
 <div id="wm-layer"></div>
 <div id="wm-dock"></div>
 
 <div id="console">
-  <div id="status-line"><span id="status">STANDING BY</span><span id="substatus">say “jarvis” — or type an order</span></div>
+  <div id="status-line"><span id="status">STANDING BY</span><span id="substatus">say “Rocky” — or just type</span></div>
   <div id="bar">
     <canvas id="reactor"></canvas>
     <div id="inputwrap"><span class="prompt">▸</span>
-      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="give jarvis an order…"></div>
+      <input id="cmd" autocomplete="off" spellcheck="false" placeholder="talk to rocky…"></div>
     <button class="btn" id="b-wake">WAKE</button>
     <button class="btn" id="b-mute">MUTE</button>
     <button class="btn" id="b-new">NEW</button>
@@ -357,19 +404,23 @@ function connect() {
     switch (m.type) {
       case "init":
         setState(m.state); earsUI(m.ears);
-        document.getElementById("t-voice").textContent = (m.voice || "—").toUpperCase();
+        buildVoiceMenu(m.voices, m.voice);
         feedEl.innerHTML = ""; liveMsg = null;
         (m.history || []).forEach(h => addMsg(h.role, h.text));
         break;
+      case "voice":
+        { const sel = document.getElementById("voice-select");
+          if (sel && m.name) sel.value = m.name; }
+        break;
       case "state": setState(m.state); break;
-      case "level": S.level = m.value; break;
-      case "stream_start": liveMsg = addMsg("jarvis", "", true); break;
+      case "level": S.level = m.value; RockyChar.setLevel(m.value); break;
+      case "stream_start": liveMsg = addMsg("rocky", "", true); break;
       case "delta":
-        if (!liveMsg) liveMsg = addMsg("jarvis", "", true);
+        if (!liveMsg) liveMsg = addMsg("rocky", "", true);
         liveMsg.body.textContent += m.text; feedEl.scrollTop = feedEl.scrollHeight; break;
       case "stream_end": if (liveMsg) liveMsg.el.classList.remove("live"); break;
       case "message":
-        if (m.role === "jarvis" && liveMsg) {
+        if (m.role === "rocky" && liveMsg) {
           liveMsg.body.textContent = m.text; liveMsg.el.classList.remove("live"); liveMsg = null;
         } else addMsg(m.role, m.text);
         break;
@@ -385,6 +436,21 @@ function connect() {
   };
 }
 function send(o) { if (wsOk) ws.send(JSON.stringify(o)); }
+function buildVoiceMenu(voices, current) {
+  const sel = document.getElementById("voice-select");
+  if (!sel) return;
+  if (!sel.dataset.built && voices && voices.length) {
+    sel.innerHTML = "";
+    voices.forEach(([label, name]) => {
+      const o = document.createElement("option");
+      o.value = name; o.textContent = label;
+      sel.appendChild(o);
+    });
+    sel.dataset.built = "1";
+    sel.addEventListener("change", () => send({ type: "set_voice", name: sel.value }));
+  }
+  if (current) sel.value = current;
+}
 function linkUI() {
   document.getElementById("dot").className = wsOk ? "on" : "";
   document.getElementById("link-txt").textContent = wsOk ? "SECURE" : "OFFLINE";
@@ -396,9 +462,9 @@ function earsUI(on) {
 connect();
 
 /* ================= status ================= */
-const STATUS = { idle: "STANDING BY", listening: "LISTENING", thinking: "PROCESSING", speaking: "SPEAKING" };
-const HINTS = { idle: "say “jarvis” — or type an order", listening: "go ahead, i'm listening", thinking: "working…", speaking: "" };
-function setState(s) { S.state = s; document.getElementById("status").textContent = STATUS[s] || s.toUpperCase(); sub(HINTS[s] ?? ""); }
+const STATUS = { idle: "STANDING BY", listening: "LISTENING", thinking: "THINKING", speaking: "TALKING" };
+const HINTS = { idle: "say “Rocky” — or just type", listening: "talk, friend — Rocky listen", thinking: "Rocky work…", speaking: "" };
+function setState(s) { S.state = s; RockyChar.setState(s); document.getElementById("status").textContent = STATUS[s] || s.toUpperCase(); sub(HINTS[s] ?? ""); }
 function sub(t) { document.getElementById("substatus").textContent = t; }
 
 /* ================= conversation ================= */
@@ -407,9 +473,9 @@ function addMsg(role, text, live = false) {
   const div = document.createElement("div");
   div.className = "msg " + role + (live ? " live" : "");
   let body = div;
-  if (role === "user" || role === "jarvis") {
+  if (role === "user" || role === "rocky") {
     const who = document.createElement("span"); who.className = "who";
-    who.textContent = role === "user" ? "YOU ›" : "JARVIS ›";
+    who.textContent = role === "user" ? "YOU ›" : "ROCKY ›";
     body = document.createElement("span"); body.className = "body"; body.textContent = text;
     div.append(who, body);
   } else div.textContent = text;
@@ -450,7 +516,7 @@ async function showArtifact(m) {
 }
 function renderBoard(items) {
   const pane = panes.board; pane.innerHTML = "";
-  if (!items || !items.length) { pane.innerHTML = '<div class="pane-hint">no thumbnails yet<br>“jarvis, make me a thumbnail for…”</div>'; return; }
+  if (!items || !items.length) { pane.innerHTML = '<div class="pane-hint">no thumbnails yet<br>“rocky, make me a thumbnail for…”</div>'; return; }
   for (const it of items) {
     const d = document.createElement("div"); d.className = "thumb";
     const num = (it.name.match(/^(\d+)/) || [])[1];
@@ -461,7 +527,7 @@ function renderBoard(items) {
 }
 function renderNotes(items) {
   const pane = panes.notes; pane.innerHTML = "";
-  if (!items || !items.length) { pane.innerHTML = '<div class="pane-hint">no notes yet<br>“jarvis, note down…”</div>'; return; }
+  if (!items || !items.length) { pane.innerHTML = '<div class="pane-hint">no notes yet<br>“rocky, note down…”</div>'; return; }
   for (const it of items) {
     const d = document.createElement("div"); d.className = "note-item"; d.textContent = "▤ " + it.name;
     d.onclick = () => send({ type: "open_note", name: it.name }); pane.appendChild(d);
@@ -498,49 +564,14 @@ async function pollStats() {
 }
 setInterval(pollStats, 4000); pollStats();
 
-/* ================= voice core (compact reactor) ================= */
-const canvas = document.getElementById("reactor");
-const ctx = canvas.getContext("2d");
-const PALETTE = {
-  idle:      { r: 255, g: 182, b: 56,  energy: 0.28, speed: 0.3 },
-  listening: { r: 95,  g: 230, b: 212, energy: 0.9,  speed: 0.6 },
-  thinking:  { r: 255, g: 210, b: 122, energy: 0.75, speed: 2.4 },
-  speaking:  { r: 255, g: 200, b: 90,  energy: 0.95, speed: 0.9 },
-};
-const cur = { ...PALETTE.idle };
-let rot = 0, pulse = 0, lastT = performance.now();
-function draw(now) {
-  const dt = Math.min((now - lastT) / 1000, 0.05); lastT = now;
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (canvas.width !== w * dpr) { canvas.width = w * dpr; canvas.height = h * dpr; }
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
-  const target = PALETTE[S.state] || PALETTE.idle;
-  for (const k of ["r", "g", "b", "energy", "speed"]) cur[k] += (target[k] - cur[k]) * Math.min(dt * 4, 1);
-  rot += dt * cur.speed; pulse += dt * 3;
-  const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 2;
-  const col = (a) => `rgba(${cur.r | 0},${cur.g | 0},${cur.b | 0},${a})`;
-  let env = 0.5 + 0.5 * Math.sin(pulse);
-  if (S.state === "listening") env = Math.min(1, 0.25 + S.level * 2.2);
-  if (S.state === "speaking") env = 0.45 + 0.3 * Math.sin(pulse * 4.2) * Math.sin(pulse * 2.7) + 0.18 * Math.sin(pulse * 9.1);
-  if (S.state === "thinking") env = 0.55 + 0.25 * Math.sin(pulse * 2);
-  const E = cur.energy * (0.55 + 0.45 * env);
-  ctx.save(); ctx.translate(cx, cy); ctx.rotate(rot);
-  for (let i = 0; i < 3; i++) { ctx.rotate(Math.PI * 2 / 3);
-    ctx.strokeStyle = col(0.6); ctx.lineWidth = 1.4; ctx.lineCap = "round";
-    ctx.beginPath(); ctx.arc(0, 0, R * 0.82, 0.2, 1.5); ctx.stroke(); }
-  ctx.restore();
-  const coreR = R * (0.32 + 0.1 * E);
-  let g = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR);
-  g.addColorStop(0, `rgba(255,248,236,${0.85 * E + 0.1})`);
-  g.addColorStop(0.4, col(0.7 * E + 0.1)); g.addColorStop(1, col(0.05));
-  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.fill();
-  ctx.strokeStyle = col(0.5); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(cx, cy, coreR, 0, Math.PI * 2); ctx.stroke();
-  requestAnimationFrame(draw);
-}
-requestAnimationFrame(draw);
+/* ================= Rocky character (centerpiece + mini voice core) ======= */
 </script>
 
+<script src="/static/rocky.js?b=9"></script>
 <script src="/static/windows.js?b=4"></script>
-<script src="/static/globe.js?b=5"></script>
-<script>GlobeStage.init();</script>
+<script src="/static/globe.js?b=6"></script>
+<script>
+  RockyChar.create(document.getElementById("rocky-corner-canvas"), { spin: true, interactive: true });
+  RockyChar.create(document.getElementById("reactor"), { mini: true });
+  GlobeStage.init();
+</script>

@@ -1,4 +1,4 @@
-"""Configuration loader for JARVIS. Reads config.yaml and merges over defaults."""
+"""Configuration loader for ROCKY. Reads config.yaml and merges over defaults."""
 import os
 import copy
 import yaml
@@ -7,15 +7,30 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PATH = os.path.join(ROOT, "config.yaml")
 
 DEFAULTS = {
-    "title": "sir",
+    "title": "friend",
     "port": 8765,
     "voice": {
-        "name": "Daniel",
-        "rate": 178,
         "enabled": True,
+        "name": "Rocko (English (US))",   # macOS `say` voice (his namesake).
+        "rate": 180,                      # pick any from the HUD dropdown.
     },
+    # Voices offered in the HUD dropdown: [display label, `say` voice name].
+    "voice_options": [
+        ["Rocko",            "Rocko (English (US))"],
+        ["Zarvox · alien",   "Zarvox"],
+        ["Trinoids · choir", "Trinoids"],
+        ["Cellos · musical", "Cellos"],
+        ["Organ",            "Organ"],
+        ["Boing",            "Boing"],
+        ["Fred · robotic",   "Fred"],
+        ["Daniel · British", "Daniel"],
+        ["Rishi · Indian",   "Rishi"],
+        ["Samantha · US",    "Samantha"],
+    ],
     "ears": {
         "enabled": True,
+        "wake_word": "rocky",       # say this to wake him ("rocky" / "hey rocky")
+        "wake_engine": "whisper",   # "whisper" = custom word via STT · "openwakeword" = "jarvis"
         "wake_threshold": 0.28,
         "mic_gain": 1.5,
         "followup_seconds": 8,
@@ -24,14 +39,15 @@ DEFAULTS = {
         "whisper_model": "base.en",
     },
     "acknowledgements": [
-        "Yes, sir?",
-        "At your service, sir.",
-        "Sir?",
-        "How can I help, sir?",
+        "Yes, friend?",
+        "I here. Talk, friend.",
+        "I listen, friend.",
+        "Question, friend?",
     ],
     "sleep_phrases": [
         "go to sleep", "that's all", "thats all", "stand down",
-        "dismissed", "thank you jarvis", "goodnight jarvis",
+        "dismissed", "sleep now", "goodbye rocky", "bye rocky",
+        "thank you rocky", "good night rocky",
     ],
     "brain": {
         "command": "claude",

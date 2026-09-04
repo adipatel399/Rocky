@@ -1,4 +1,4 @@
-/* JARVIS window manager — every result is a draggable, resizable,
+/* ROCKY window manager — every result is a draggable, resizable,
    voice-controllable floating window. Small by default; "make it full screen"
    maximizes it. This is the generic surface every data provider renders into. */
 "use strict";

@@ -1,22 +1,23 @@
-"""JARVIS's ears v3: always-on wake word + true conversation mode.
+"""ROCKY's ears v3: always-on wake word + true conversation mode.
 
 Pipeline (100% on-device):
   mic → openWakeWord "hey jarvis" → record → faster-whisper → brain
 
 v3 fixes and behavior:
-- Wake word only OPENS a conversation. After each reply Jarvis immediately
+- Wake word only OPENS a conversation. After each reply Rocky immediately
   listens again — speak naturally, no wake word needed. The conversation ends
   after `followup_seconds` of silence or a sleep phrase.
 - Mic input is software-amplified (`mic_gain`) and the wake threshold is tuned
-  for saying just "Jarvis" (the model was trained on "hey jarvis").
+  for saying just "Rocky" (the model was trained on "hey jarvis").
 - The noise floor only calibrates while truly idle — previously it inflated
-  while Jarvis himself was speaking, deafening the follow-up window.
-- The input buffer is flushed after Jarvis speaks so he never hears his own
+  while Rocky himself was speaking, deafening the follow-up window.
+- The input buffer is flushed after Rocky speaks so he never hears his own
   echo, and wake-model state is reset after busy periods.
 """
 import asyncio
 import os
 import random
+import re
 import threading
 import time
 
@@ -27,7 +28,7 @@ PREROLL_FRAMES = 8  # ~0.64 s kept before speech onset so word starts aren't cli
 
 class Ears(threading.Thread):
     def __init__(self, core, cfg: dict, loop: asyncio.AbstractEventLoop):
-        super().__init__(daemon=True, name="jarvis-ears")
+        super().__init__(daemon=True, name="rocky-ears")
         self.core = core
         self.cfg = cfg
         self.ecfg = cfg["ears"]
@@ -38,6 +39,8 @@ class Ears(threading.Thread):
         self.peak_score = 0.0  # recent best wake score — visible in /api/stats for tuning
         self.gain = float(self.ecfg.get("mic_gain", 1.5))
         self._noise_floor = 60.0
+        self.wake_word = str(self.ecfg.get("wake_word", "rocky")).lower()
+        self.wake_engine = str(self.ecfg.get("wake_engine", "whisper")).lower()
 
     # ---------- lifecycle ----------
 
@@ -54,14 +57,16 @@ class Ears(threading.Thread):
             return
 
         try:
-            model_dir = os.path.join(os.path.dirname(openwakeword.__file__),
-                                     "resources", "models")
-            wake_path = os.path.join(model_dir, "hey_jarvis_v0.1.onnx")
-            if not os.path.exists(wake_path):
-                self._notify_system("Downloading wake-word model (first run)…")
-                openwakeword.utils.download_models()
-            self.wake = WakeModel(wakeword_models=[wake_path],
-                                  inference_framework="onnx")
+            self.wake = None
+            if self.wake_engine == "openwakeword":
+                model_dir = os.path.join(os.path.dirname(openwakeword.__file__),
+                                         "resources", "models")
+                wake_path = os.path.join(model_dir, "hey_jarvis_v0.1.onnx")
+                if not os.path.exists(wake_path):
+                    self._notify_system("Downloading wake-word model (first run)…")
+                    openwakeword.utils.download_models()
+                self.wake = WakeModel(wakeword_models=[wake_path],
+                                      inference_framework="onnx")
 
             self._notify_system("Loading speech recognition model…")
             self.whisper = WhisperModel(self.ecfg.get("whisper_model", "base.en"),
@@ -77,8 +82,12 @@ class Ears(threading.Thread):
             return
 
         self.ready = True
-        self._notify_system("Ears online — say “Jarvis” anytime.")
-        self._listen_forever()
+        ww = self.wake_word.title()
+        self._notify_system(f"Rocky awake. Ears good, good, good. Say “{ww}” to wake me.")
+        if self.wake_engine == "openwakeword":
+            self._listen_forever()
+        else:
+            self._listen_whisper()
 
     # ---------- audio helpers ----------
 
@@ -92,14 +101,122 @@ class Ears(threading.Thread):
         return pcm, rms
 
     def _flush_input(self):
-        """Discard buffered audio (e.g. Jarvis's own voice while he spoke)."""
+        """Discard buffered audio (e.g. Rocky's own voice while he spoke)."""
         try:
             while self.stream.read_available >= FRAME:
                 self.stream.read(FRAME)
         except Exception:
             pass
 
-    # ---------- main loop: wake-word watch ----------
+    # ---------- Whisper wake word ("Rocky" / "Hey Rocky") ----------
+
+    def _listen_whisper(self):
+        """Energy-gated keyword spotting: when speech is heard, transcribe it
+        and only wake if it begins with the wake word. The rest of the sentence
+        becomes the first command, so "Rocky, what's the weather" works in one
+        breath. No cloud, no extra model — reuses Whisper."""
+        while True:
+            try:
+                if self.muted or self.core.state != "idle":
+                    time.sleep(0.05)
+                    continue
+                pcm, rms = self._read_frame()
+                self._noise_floor = 0.98 * self._noise_floor + 0.02 * rms
+                gate = max(2.5 * self._noise_floor, 250)
+                if rms <= gate:
+                    continue  # silence — keep listening cheaply (no Whisper)
+
+                audio = self._record_utterance(pcm)
+                text = self._transcribe(audio)
+                if not text:
+                    self._set_state("idle")
+                    continue
+                matched, remainder = self._wake_match(text)
+                self.peak_score = 1.0 if matched else 0.0
+                if not matched:
+                    self._set_state("idle")
+                    continue
+                self._converse_whisper(remainder)
+            except Exception as e:
+                self._notify_system(f"Ears recovered from an error: {e}")
+                self._set_state("idle")
+                time.sleep(0.5)
+
+    def _wake_match(self, text: str):
+        """Return (matched, remainder_command). Lenient — ASR often mishears
+        'Rocky' as rock/rocket/ricky, so accept any first word starting 'rock'
+        (or the configured wake word) within the first two words."""
+        words = re.sub(r"[^a-z' ]", "", text.lower()).split()
+        if not words:
+            return False, ""
+        variants = {self.wake_word, "rocky", "rock", "rockie", "rocco", "ricky", "rocketh"}
+        for i in range(min(2, len(words))):
+            w = words[i]
+            if w in variants or w.startswith("rock"):
+                rem = " ".join(words[i + 1:]).strip()
+                rem = re.sub(r"^(hey|hi|hello|okay|ok|please)\b", "", rem).strip()
+                return True, rem
+        return False, ""
+
+    def _record_utterance(self, preroll):
+        """Record from an already-detected speech onset until a trailing pause."""
+        np = self.np
+        silence_limit = float(self.ecfg.get("silence_seconds", 1.4))
+        max_seconds = float(self.ecfg.get("max_command_seconds", 14))
+        gate = max(2.5 * self._noise_floor, 250)
+        self._set_state("listening")
+        chunks = [preroll]
+        silent = 0.0
+        t1 = time.monotonic()
+        while time.monotonic() - t1 < max_seconds:
+            pcm, rms = self._read_frame()
+            chunks.append(pcm)
+            self._send_level(min(rms / 3000.0, 1.0))
+            if rms > gate:
+                silent = 0.0
+            else:
+                silent += FRAME / SAMPLE_RATE
+                if silent >= silence_limit:
+                    break
+        self._send_level(0.0)
+        audio = np.concatenate(chunks).astype(np.float32) / 32768.0
+        audio = np.nan_to_num(audio)
+        if float(np.max(np.abs(audio))) < 1e-4:
+            return None
+        return audio
+
+    def _converse_whisper(self, remainder: str):
+        """After the wake word: run the first command (if any) then keep the
+        conversation open, no wake word needed, until silence or a sleep phrase."""
+        followup = float(self.ecfg.get("followup_seconds", 8))
+        if remainder and len(remainder) >= 2:
+            self._run_command(remainder)          # "Rocky, <command>" in one breath
+        else:
+            self.core.voice.speak_blocking(random.choice(self.cfg["acknowledgements"]))
+        while True:
+            self._set_state("listening")
+            self._flush_input()
+            audio = self._record(wait_seconds=followup)
+            text = self._transcribe(audio)
+            if not text:
+                break
+            low = text.lower().strip(" .!?,")
+            if any(p in low for p in self.cfg["sleep_phrases"]):
+                self._notify_user(text)
+                self.core.voice.speak_blocking("Good. Sleep now, friend.")
+                break
+            self._run_command(text)
+        self._set_state("idle")
+
+    def _run_command(self, text: str):
+        future = asyncio.run_coroutine_threadsafe(
+            self.core.handle_command(text, source="voice"), self.loop)
+        try:
+            future.result()
+        except Exception:
+            pass
+
+    # ---------- main loop: wake-word watch (openWakeWord) ----------
 
     def _listen_forever(self):
         threshold = float(self.ecfg.get("wake_threshold", 0.28))
@@ -147,13 +264,13 @@ class Ears(threading.Thread):
 
             if not text:
                 if first:
-                    self.core.voice.speak_blocking("I didn't catch that, sir.")
+                    self.core.voice.speak_blocking("I not hear, friend. Say again.")
                 break  # silence — conversation over
 
             lowered = text.lower().strip(" .!?,")
             if any(p in lowered for p in self.cfg["sleep_phrases"]):
                 self._notify_user(text)
-                self.core.voice.speak_blocking("Very good, sir.")
+                self.core.voice.speak_blocking("Good. Sleep now, friend.")
                 break
 
             future = asyncio.run_coroutine_threadsafe(
