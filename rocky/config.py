@@ -50,9 +50,11 @@ DEFAULTS = {
         "thank you rocky", "good night rocky",
     ],
     "brain": {
-        "command": "claude",
+        "provider": "codex",
+        "command": "codex",
         "model": None,
-        "cwd": "~",
+        "cwd": ROOT,
+        "sandbox": "workspace-write",
         "permission_mode": "acceptEdits",
         "allowed_tools": [
             "Bash", "Read", "Glob", "Grep", "Write", "Edit",

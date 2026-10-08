@@ -1,14 +1,13 @@
-"""ROCKY's brain v2: a PERSISTENT headless Claude Code session.
+"""ChatGPT-authenticated Codex CLI with resumable Rocky conversations.
 
-v1 spawned `claude -p` per command — every exchange paid process startup plus
-session reload, which grew with history. v2 keeps one `claude` process alive
-with stream-json on stdin/stdout: commands are written as JSON lines, replies
-stream back as text deltas the moment they're generated. Combined with
-sentence-streaming TTS, Rocky starts speaking while he's still thinking.
+Completed messages and tool activity arrive as JSONL. Each request resumes
+Rocky's own session; NEW clears it. Claude remains an optional legacy backend.
 """
 import asyncio
 import json
 import os
+import shutil
+import signal
 
 from . import config as config_mod
 
@@ -154,6 +153,106 @@ class Brain:
     # ---------- the exchange ----------
 
     async def ask(self, text: str, on_delta=None, on_activity=None) -> str:
+        if self.cfg["brain"].get("provider", "codex") == "claude":
+            return await self._ask_claude(text, on_delta, on_activity)
+        return await self._ask_codex(text, on_delta, on_activity)
+
+    def _codex_cmd(self):
+        b = self.cfg["brain"]
+        command = b.get("command", "codex")
+        if command == "codex" and not shutil.which(command):
+            for path in (
+                "/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex",
+                "/Applications/Codex.app/Contents/Resources/codex",
+            ):
+                if os.path.isfile(path) and os.access(path, os.X_OK):
+                    command = path
+                    break
+        cmd = [command, "exec"]
+        if self.session_id:
+            cmd += ["resume"]
+        cmd += ["--json", "--skip-git-repo-check", "--ignore-user-config",
+                "-c", 'forced_login_method="chatgpt"',
+                "-c", 'approval_policy="never"',
+                "-c", "sandbox_mode=" + json.dumps(b.get("sandbox", "workspace-write")),
+                "-c", "developer_instructions=" + json.dumps(self.persona)]
+        if b.get("model"):
+            cmd += ["--model", b["model"]]
+        if self.session_id:
+            cmd += [self.session_id]
+        return cmd + ["-"]
+
+    async def _ask_codex(self, text, on_delta=None, on_activity=None):
+        """Use saved ChatGPT auth; resume only Rocky's own captured thread."""
+        async with self.lock:
+            b = self.cfg["brain"]
+            env = dict(os.environ)
+            for key in ("OPENAI_API_KEY", "CODEX_API_KEY", "AZURE_OPENAI_API_KEY"):
+                env.pop(key, None)
+            try:
+                self.proc = await asyncio.create_subprocess_exec(
+                    *self._codex_cmd(), stdin=asyncio.subprocess.PIPE,
+                    stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+                    cwd=os.path.expanduser(b.get("cwd") or config_mod.ROOT),
+                    env=env, start_new_session=True,
+                )
+            except FileNotFoundError:
+                return "Codex not installed, friend. Install Codex CLI, then run codex login with ChatGPT."
+            proc = self.proc
+            # Drain stderr concurrently so verbose diagnostics cannot block stdout.
+            stderr_task = asyncio.create_task(proc.stderr.read())
+            replies = []
+            error = None
+            async def read_turn():
+                nonlocal error
+                proc.stdin.write(text.encode())
+                await proc.stdin.drain()
+                proc.stdin.close()
+                while line := await proc.stdout.readline():
+                    try:
+                        event = json.loads(line)
+                    except (ValueError, UnicodeDecodeError):
+                        continue
+                    kind = event.get("type")
+                    if kind == "thread.started":
+                        self.session_id = event.get("thread_id") or self.session_id
+                    elif kind in ("error", "turn.failed"):
+                        failure = event.get("error") or {}
+                        error = event.get("message") or (failure.get("message") if isinstance(failure, dict) else str(failure)) or "Codex request failed."
+                    elif kind in ("item.started", "item.completed"):
+                        item = event.get("item") or {}
+                        if kind == "item.completed" and item.get("type") == "agent_message":
+                            message = item.get("text", "")
+                            if message:
+                                replies.append(message)
+                                if on_delta:
+                                    await on_delta(message + "\n")
+                        elif kind == "item.started" and on_activity:
+                            await on_activity(item.get("command") or item.get("type", "working"))
+                await proc.wait()
+            try:
+                await asyncio.wait_for(read_turn(), b.get("timeout_seconds", 600))
+                diagnostics = (await stderr_task).decode("utf-8", "replace")
+                if error or proc.returncode:
+                    detail = error or diagnostics[-1500:] or "Codex exited without a response."
+                    if any(word in detail.lower() for word in ("auth", "login", "sign in", "401")):
+                        return "ChatGPT login needs attention, friend. Run codex login and choose Sign in with ChatGPT."
+                    return "Brain request failed, friend. " + detail
+                return "\n".join(replies).strip() or "Done, friend."
+            except asyncio.TimeoutError:
+                self.kill()
+                return "Too long, friend. I stop it. Try again."
+            except asyncio.CancelledError:
+                self.kill()
+                raise
+            finally:
+                if proc.returncode is None:
+                    self.kill()
+                await proc.wait()
+                await stderr_task
+                self.proc = None
+
+    async def _ask_claude(self, text: str, on_delta=None, on_activity=None) -> str:
         """Send a command; stream text deltas via on_delta as they generate.
         Returns the full reply text."""
         async with self.lock:
@@ -235,7 +334,10 @@ class Brain:
         with --resume on the captured session id."""
         if self.proc and self.proc.returncode is None:
             try:
-                self.proc.kill()
+                if self.cfg["brain"].get("provider", "codex") == "codex":
+                    os.killpg(self.proc.pid, signal.SIGKILL)
+                else:
+                    self.proc.kill()
             except ProcessLookupError:
                 pass
         self.proc = None

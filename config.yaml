@@ -49,12 +49,13 @@ sleep_phrases:
    "sleep now", "goodbye rocky", "bye rocky", "thank you rocky", "good night rocky"]
 
 brain:
-  command: "claude"
-  model: null              # null = your Claude Code default. "haiku" = snappiest
-                           # conversation; "sonnet"/"opus" = smarter, slower.
-  cwd: "~"                 # the directory Rocky's hands operate from
+  provider: "codex"        # ChatGPT account through Codex CLI; "claude" optional
+  command: "codex"         # also auto-detects the bundled macOS app CLI
+  model: null              # null = Codex default; use a model your account supports
+  cwd: null                # null = this Rocky project directory
+  sandbox: "workspace-write" # read-only / workspace-write / danger-full-access
   permission_mode: "acceptEdits"
-  # Tools the headless Claude session may use without asking.
+  # Legacy Claude-only options below (ignored by Codex).
   # This is what makes Rocky able to *act*. Trim it to restrict him.
   allowed_tools:
     ["Bash", "Read", "Glob", "Grep", "Write", "Edit",

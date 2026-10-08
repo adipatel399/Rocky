@@ -16,7 +16,7 @@ I watched **Project Hail Mary** and completely fell in love with **Rocky** — t
 
 So, for fun, I built my own Rocky — a real, working AI assistant that lives on my Mac, talks exactly like him, and can actually *do things*. You say **"Rocky,"** he wakes up, you talk to him like a friend, and he acts: opens apps, searches the web, writes files, checks your system, flies a 3D globe to your answer, and shows you the results on a glowing screen while he explains it out loud — in Rocky's voice.
 
-Nothing here is cloud magic pretending to be local — the wake word and speech-to-text genuinely run on your machine. The only thing that leaves your Mac is what he explicitly searches for or opens on your behalf.
+Wake-word detection, speech-to-text, speech output, and the HUD run locally. Rocky's AI brain uses OpenAI's Codex CLI signed in with your ChatGPT account: prompts and relevant tool context are sent to OpenAI. Weather, news, and other online features contact their data providers.
 
 ---
 
@@ -53,9 +53,9 @@ flowchart TB
         T["⌨️ Or just type"]
     end
 
-    subgraph Mac["Your Mac — everything below runs locally"]
+    subgraph Mac["Your Mac — local orchestration, cloud-backed AI"]
         Ears["👂 Ears<br/><small>wake-word + speech-to-text</small>"]
-        Brain["🧠 Brain<br/><small>a live Claude session, always warm</small>"]
+        Brain["🧠 Brain<br/><small>Codex + ChatGPT account</small>"]
         Voice["🔊 Voice<br/><small>macOS speech, sentence by sentence</small>"]
         HUD["🖥️ HUD<br/><small>the glowing window + globe</small>"]
         Data["🗂️ His memory<br/><small>notes · diagrams · thumbnails</small>"]
@@ -74,8 +74,8 @@ flowchart TB
 
 **In plain English:**
 - **Ears** — always listening quietly for "Rocky," transcribing offline with Whisper and only waking on a match. Say the wake word and the rest of your sentence in one go — he splits off the command automatically.
-- **Brain** — Rocky's mind: a real, persistent AI session that stays "warm" so it doesn't restart every time you talk. This is what lets him actually *do* things, not just chat.
-- **Voice** — macOS `say`, streamed sentence-by-sentence so he starts talking while still thinking. Pick any installed voice live from the HUD dropdown.
+- **Brain** — Codex CLI uses your saved ChatGPT login. Each request runs a CLI process and resumes Rocky's own conversation ID; NEW starts a fresh conversation. Completed assistant messages and tool activity are sent to the HUD as they arrive. This is a separate conversation from the ChatGPT/Codex app chat.
+- **Voice** — macOS `say` speaks completed Codex messages sentence by sentence. Tool activity appears while Rocky works; this backend does not stream individual text tokens. Pick any installed voice live from the HUD dropdown.
 - **HUD** — the glowing display: the conversation, an always-on photoreal globe, the little Rocky floating in the corner, and a side panel for diagrams, plans, and images.
 - **His memory** — notes, records, and a thumbnail gallery in plain files on your Mac, so they survive restarts and you can open them yourself anytime.
 
@@ -87,17 +87,25 @@ flowchart TB
 
 ```bash
 cd ~/Downloads/Rocky
-python3 -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/pip install -r requirements.txt
+# Install Codex CLI if your ChatGPT/Codex desktop app does not bundle it:
+npm install -g @openai/codex
+codex login
+codex login status
 ```
 
 **Every time after that:**
 
 ```bash
-rocky
+./bin/rocky
 ```
 
 That's it. This single command wakes him up in the current terminal and opens his window — a clean, chromeless display with no browser tabs or address bar, just Rocky.
+
+Choose **Sign in with ChatGPT** during login. An eligible ChatGPT plan with Codex access is required; Codex account limits apply. Rocky does not need a Claude subscription or an OpenAI API key for this mode. It ignores API-key environment overrides and uses ChatGPT authentication. See [OpenAI authentication](https://developers.openai.com/codex/auth) and [non-interactive Codex](https://developers.openai.com/codex/noninteractive).
+
+Use Python 3.12 on macOS. Approve microphone access when prompted. Rocky can auto-detect the CLI bundled in the macOS ChatGPT/Codex app if `codex` is not on PATH. To use `rocky` from any terminal, add the project's `bin` directory to PATH; otherwise use `./bin/rocky`, `./bin/rocky stop`, and `./bin/rocky logs` from the project folder. Open the HUD directly at http://localhost:8765.
 
 | Command | What it does |
 |---|---|
@@ -180,7 +188,7 @@ Rocky's spatial interface isn't hardcoded per feature. It's built on three primi
 
 1. **Cinematic camera** — every location query runs the same choreography: pull back → rotate across the globe → zoom into the target's exact coords.
 2. **Window manager** — every result is a floating window you can **drag, resize, minimize, or maximize**. They open small and coexist.
-3. **Intent → provider router** — one pipeline maps your words to a provider and renders the result. Today's providers (all free, keyless, local):
+3. **Intent → provider router** — one pipeline maps your words to a provider and renders the result. Today's providers (keyless online sources):
 
    | Say | Provider | You get |
    |-----|----------|---------|
@@ -207,9 +215,15 @@ Everything about how he sounds, listens, and behaves lives in one plain-English 
 | `ears.mic_gain` | Boosts your mic before he processes it |
 | `ears.followup_seconds` | How long a conversation stays open after each reply |
 | `brain.model` | Which AI model powers him |
-| `brain.allowed_tools` | What he's allowed to actually *do* — trim to hold him back, leave broad to let him act freely |
+| `brain.provider` / `brain.command` | `codex` by default; optional legacy `claude` backend |
+| `brain.sandbox` | `workspace-write` by default; `read-only` prevents edits; `danger-full-access` allows unrestricted local commands |
+| `brain.cwd` | `null` uses the Rocky project as its working directory |
 
 > **A note on trust:** by default, Rocky asks before anything risky or irreversible (sending a message, calling someone, deleting, spending money) and says out loud what he's about to do. Some Mac actions (Reminders, Messages, screenshots) trigger a one-time macOS permission prompt the first time — that's your approval, not a bug.
+
+Codex runs without interactive terminal approval prompts. Its default workspace sandbox restricts writes outside the project, so some whole-Mac actions may be blocked. Only select `danger-full-access` if you intend to grant those permissions. Rocky's spoken confirmation rules are persona instructions, not a security boundary. User Codex configuration is not loaded by this backend, so unrelated personal MCP servers are not started. For legacy Claude, set `provider: claude`, `command: claude`, and a valid Claude model/login; `permission_mode` and `allowed_tools` only affect that backend.
+
+If the brain reports a login error, run `codex login`, choose ChatGPT, and press NEW in the HUD. If it reports a usage limit, wait for your Codex allowance to reset. If ears are offline, check `/api/stats` for `ears_error`, install all requirements, and restart; the voice model may take time to load on first start.
 
 ---
 
