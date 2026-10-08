@@ -74,8 +74,8 @@ flowchart TB
 
 **In plain English:**
 - **Ears** — always listening quietly for "Rocky," transcribing offline with Whisper and only waking on a match. Say the wake word and the rest of your sentence in one go — he splits off the command automatically.
-- **Brain** — Codex CLI uses your saved ChatGPT login. Each request runs a CLI process and resumes Rocky's own conversation ID; NEW starts a fresh conversation. Completed assistant messages and tool activity are sent to the HUD as they arrive. This is a separate conversation from the ChatGPT/Codex app chat.
-- **Voice** — macOS `say` speaks completed Codex messages sentence by sentence. Tool activity appears while Rocky works; this backend does not stream individual text tokens. Pick any installed voice live from the HUD dropdown.
+- **Brain** — Codex uses your saved ChatGPT login through a persistent app-server process warmed at startup. Requests share Rocky's own conversation, and individual text tokens stream to the HUD; NEW starts fresh. Low reasoning effort is the default for faster voice replies. This is a separate conversation from the ChatGPT/Codex app chat.
+- **Voice** — macOS `say` speaks each sentence as streaming text completes it. Voice commands receive a short acknowledgment while the brain starts working. Backend errors are also spoken, and playback failures appear in `/api/stats`. Pick any installed voice live from the HUD dropdown.
 - **HUD** — the glowing display: the conversation, an always-on photoreal globe, the little Rocky floating in the corner, and a side panel for diagrams, plans, and images.
 - **His memory** — notes, records, and a thumbnail gallery in plain files on your Mac, so they survive restarts and you can open them yourself anytime.
 
@@ -218,10 +218,14 @@ Everything about how he sounds, listens, and behaves lives in one plain-English 
 | `brain.provider` / `brain.command` | `codex` by default; optional legacy `claude` backend |
 | `brain.sandbox` | `workspace-write` by default; `read-only` prevents edits; `danger-full-access` allows unrestricted local commands |
 | `brain.cwd` | `null` uses the Rocky project as its working directory |
+| `brain.transport` | `app-server` keeps Codex warm and streams tokens; `exec` is a slower compatibility fallback |
+| `brain.reasoning_effort` | `low` favors fast conversation; increase for harder tasks |
 
 > **A note on trust:** by default, Rocky asks before anything risky or irreversible (sending a message, calling someone, deleting, spending money) and says out loud what he's about to do. Some Mac actions (Reminders, Messages, screenshots) trigger a one-time macOS permission prompt the first time — that's your approval, not a bug.
 
-Codex runs without interactive terminal approval prompts. Its default workspace sandbox restricts writes outside the project, so some whole-Mac actions may be blocked. Only select `danger-full-access` if you intend to grant those permissions. Rocky's spoken confirmation rules are persona instructions, not a security boundary. User Codex configuration is not loaded by this backend, so unrelated personal MCP servers are not started. For legacy Claude, set `provider: claude`, `command: claude`, and a valid Claude model/login; `permission_mode` and `allowed_tools` only affect that backend.
+Codex runs without interactive terminal approval prompts. Its default workspace sandbox restricts writes outside the project, so some whole-Mac actions may be blocked. Only select `danger-full-access` if you intend to grant those permissions. Rocky's spoken confirmation rules are persona instructions, not a security boundary. The app-server backend overrides MCP servers to avoid launching unrelated integrations and sets its own thread instructions, permissions, and reasoning effort. The `exec` fallback ignores user configuration. For legacy Claude, set `provider: claude`, `command: claude`, and a valid Claude model/login; `permission_mode` and `allowed_tools` only affect that backend.
+
+Voice diagnostics in `/api/stats` include `mic_rms`, `speech_gate`, `last_transcript`, `last_wake_match`, `voice_error`, `last_command_error`, `brain_ready`, and `brain_first_delta_seconds`. Wake parsing preserves numbers and punctuation. End-of-question silence defaults to 0.8 seconds; increase it if Rocky cuts you off. Cloud/model latency still varies; first-token timing excludes microphone capture and playback.
 
 If the brain reports a login error, run `codex login`, choose ChatGPT, and press NEW in the HUD. If it reports a usage limit, wait for your Codex allowance to reset. If ears are offline, check `/api/stats` for `ears_error`, install all requirements, and restart; the voice model may take time to load on first start.
 

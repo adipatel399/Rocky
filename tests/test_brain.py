@@ -12,6 +12,7 @@ class CodexBrainTests(unittest.IsolatedAsyncioTestCase):
     def brain(self):
         cfg = load()
         cfg['brain']['timeout_seconds'] = 5
+        cfg['brain']['transport'] = 'exec'
         return Brain(cfg)
 
     def command(self, events, sleep=0):

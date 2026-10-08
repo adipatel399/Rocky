@@ -41,6 +41,19 @@ class WakeDetectionTests(unittest.TestCase):
         for phrase in ('Rocky.', 'Hey Rocky!'):
             self.assertEqual(ears._wake_match(phrase), (True, ''))
 
+    def test_command_preserves_numbers_and_punctuation(self):
+        ears = self.ears()
+        self.assertEqual(ears._wake_match('Hey Rocky, what is 2 plus 2?'),
+                         (True, 'what is 2 plus 2?'))
+        self.assertEqual(ears._wake_match('Rocky, set timer for 10 minutes.'),
+                         (True, 'set timer for 10 minutes.'))
+
+    def test_background_noise_cannot_raise_gate_forever(self):
+        ears = self.ears()
+        for _ in range(1000):
+            ears._calibrate_noise(ears._speech_gate() - 1)
+        self.assertLessEqual(ears._noise_floor, 120)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -112,7 +112,8 @@ class Ears(threading.Thread):
     def _calibrate_noise(self, rms):
         # Never teach the silence estimator a loud speech frame.
         if rms < self._speech_gate():
-            self._noise_floor = 0.98 * self._noise_floor + 0.02 * rms
+            self._noise_floor = min(float(self.ecfg.get("max_noise_floor", 120)),
+                                    0.98 * self._noise_floor + 0.02 * rms)
 
     def _flush_input(self):
         """Discard buffered audio (e.g. Rocky's own voice while he spoke)."""
@@ -171,15 +172,15 @@ class Ears(threading.Thread):
         """Return (matched, remainder_command). Lenient — ASR often mishears
         'Rocky' as rock/rocket/ricky, so accept any first word starting 'rock'
         (or the configured wake word) within the first two words."""
-        words = re.sub(r"[^a-z' ]", "", text.lower()).split()
+        words = list(re.finditer(r"[a-z']+", text.lower()))
         if not words:
             return False, ""
         variants = {self.wake_word, "rocky", "rock", "rockie", "rocco", "ricky", "rocketh"}
         for i in range(min(2, len(words))):
-            w = words[i]
+            w = words[i].group()
             if w in variants or w.startswith("rock"):
-                rem = " ".join(words[i + 1:]).strip()
-                rem = re.sub(r"^(hey|hi|hello|okay|ok|please)\b", "", rem).strip()
+                rem = text[words[i].end():].lstrip(" ,.!?:;-\t\n")
+                rem = re.sub(r"^(hey|hi|hello|okay|ok|please)\b[ ,]*", "", rem, flags=re.I).strip()
                 return True, rem
         return False, ""
 
@@ -238,8 +239,10 @@ class Ears(threading.Thread):
             self.core.handle_command(text, source="voice"), self.loop)
         try:
             future.result()
-        except Exception:
-            pass
+        except Exception as e:
+            self.error = f"voice command failed: {e}"
+            self._notify_system(self.error)
+            self._set_state("idle")
 
     # ---------- main loop: wake-word watch (openWakeWord) ----------
 

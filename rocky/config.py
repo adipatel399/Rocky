@@ -52,6 +52,8 @@ DEFAULTS = {
     "brain": {
         "provider": "codex",
         "command": "codex",
+        "transport": "app-server",
+        "reasoning_effort": "low",
         "model": None,
         "cwd": ROOT,
         "sandbox": "workspace-write",

@@ -1,7 +1,7 @@
-"""ChatGPT-authenticated Codex CLI with resumable Rocky conversations.
+"""ChatGPT-authenticated, warm Codex connection with token streaming.
 
-Completed messages and tool activity arrive as JSONL. Each request resumes
-Rocky's own session; NEW clears it. Claude remains an optional legacy backend.
+The app-server keeps Rocky's thread loaded between turns. An exec compatibility
+fallback and the legacy Claude backend remain available. NEW clears context.
 """
 import asyncio
 import json
@@ -10,6 +10,7 @@ import shutil
 import signal
 
 from . import config as config_mod
+from .codex_backend import CodexBackend
 
 DATA_DIR = os.path.join(config_mod.ROOT, "data")
 
@@ -112,6 +113,7 @@ class Brain:
         self.session_id = None
         self.proc = None
         self.lock = asyncio.Lock()
+        self.codex = None
         self.persona = PERSONA.format(
             title=cfg.get("title", "sir"), name=user_name, data=DATA_DIR)
 
@@ -155,7 +157,47 @@ class Brain:
     async def ask(self, text: str, on_delta=None, on_activity=None) -> str:
         if self.cfg["brain"].get("provider", "codex") == "claude":
             return await self._ask_claude(text, on_delta, on_activity)
-        return await self._ask_codex(text, on_delta, on_activity)
+        if self.cfg['brain'].get('transport', 'app-server') == 'exec':
+            return await self._ask_codex(text, on_delta, on_activity)
+        async with self.lock:
+            try:
+                await self.warmup_locked()
+                reply = await asyncio.wait_for(self.codex.ask(text, on_delta, on_activity),
+                                                self.cfg['brain'].get('timeout_seconds', 600))
+                self.session_id = self.codex.thread_id
+                return reply
+            except FileNotFoundError:
+                return 'Codex not installed, friend. Install Codex CLI, then run codex login.'
+            except asyncio.TimeoutError:
+                await self.codex.close()
+                return 'Too long, friend. I stop it. Try again.'
+            except asyncio.CancelledError:
+                if self.codex:
+                    await self.codex.close()
+                raise
+            except Exception as e:
+                if self.codex:
+                    await self.codex.close()
+                if any(word in str(e).lower() for word in ('auth', '401', 'login')):
+                    return 'ChatGPT login needs attention, friend. Run codex login.'
+                return 'Brain request failed, friend. ' + str(e)
+
+    async def warmup_locked(self):
+        if self.codex is None:
+            b = self.cfg['brain']
+            self.codex = CodexBackend(self._codex_cmd()[0], b, self.persona,
+                                      os.path.expanduser(b.get('cwd') or config_mod.ROOT))
+        await asyncio.wait_for(self.codex.ensure_ready(), 30)
+
+    async def warmup(self):
+        if self.cfg['brain'].get('provider', 'codex') != 'codex' or self.cfg['brain'].get('transport') == 'exec':
+            return
+        async with self.lock:
+            try:
+                await self.warmup_locked()
+            except Exception:
+                if self.codex:
+                    await self.codex.close()
 
     def _codex_cmd(self):
         b = self.cfg["brain"]
@@ -332,6 +374,8 @@ class Brain:
     def kill(self):
         """Stop the brain process. Context survives — next ask() respawns
         with --resume on the captured session id."""
+        if self.codex:
+            self.codex.kill()
         if self.proc and self.proc.returncode is None:
             try:
                 if self.cfg["brain"].get("provider", "codex") == "codex":
@@ -345,3 +389,5 @@ class Brain:
     def reset_session(self):
         self.kill()
         self.session_id = None
+        if self.codex:
+            self.codex.thread_id = None

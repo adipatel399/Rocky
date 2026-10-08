@@ -2,6 +2,7 @@
 import asyncio
 import collections
 import json
+import logging
 import os
 import time
 
@@ -44,6 +45,9 @@ class RockyCore:
         self.busy = False
         self.last_globe = None
         self.started_at = time.time()
+        self.last_command_source = None
+        self.last_reply_seconds = None
+        self.last_command_error = None
 
     # ---------- broadcasting ----------
 
@@ -86,17 +90,26 @@ class RockyCore:
 
         self.busy = True
         self.current_task = asyncio.current_task()
+        started = time.monotonic()
+        self.last_command_source = source
+        self.last_command_error = None
         await self.post_message("user", text)
         await self.set_state("thinking")
 
         try:
+            if source == "voice":
+                await self.voice.speak("Yes, friend.")
+                await self.set_state("thinking")
             # --- Geospatial fast path: geocode + live data, no LLM round-trip.
             if await self._try_geo(text):
                 return
 
             await self.broadcast({"type": "stream_start"})
+            streamed = False
 
             async def on_delta(fragment: str):
+                nonlocal streamed
+                streamed = streamed or bool(fragment.strip())
                 await self.broadcast({"type": "delta", "text": fragment})
                 await self.voice.feed(fragment)
 
@@ -105,6 +118,9 @@ class RockyCore:
 
             reply = await self.brain.ask(text, on_delta=on_delta,
                                          on_activity=on_activity)
+            if not streamed:
+                # Auth/timeout/provider errors return text without delta callbacks.
+                await self.voice.speak(reply)
             await self.voice.flush()
             await self.broadcast({"type": "stream_end"})
             await self.post_message("rocky", reply)
@@ -113,9 +129,18 @@ class RockyCore:
         except asyncio.CancelledError:
             self.voice.stop()
             await self.post_message("system", "Interrupted.")
+        except Exception as e:
+            self.last_command_error = str(e)
+            logging.exception("Rocky command failed")
+            await self.broadcast({"type": "stream_end"})
+            await self.post_message("system", f"Command failed: {e}")
+            await self.voice.speak("Something went wrong, friend. Try again.")
+            await self.voice.wait_idle()
         finally:
             self.busy = False
             self.current_task = None
+            self.last_reply_seconds = round(time.monotonic() - started, 2)
+            await self.set_state("idle")
 
     async def _try_geo(self, text: str) -> bool:
         """Intel fast path: camera moves + data windows + UI actions, no LLM
@@ -289,6 +314,7 @@ def _read_globe(path: str):
 
 @app.on_event("startup")
 async def startup():
+    asyncio.ensure_future(core.brain.warmup())
     if cfg["ears"].get("enabled", True):
         try:
             _start_ears(asyncio.get_event_loop())
@@ -297,6 +323,13 @@ async def startup():
         asyncio.ensure_future(_watchdog())
     asyncio.ensure_future(_watch_data())
     print(f"[rocky] HUD → http://localhost:{cfg['port']}")
+
+
+@app.on_event('shutdown')
+async def shutdown():
+    core.interrupt()
+    if core.brain.codex:
+        await core.brain.codex.close()
 
 
 def _start_ears(loop):
@@ -377,6 +410,14 @@ async def stats():
         "speech_gate": round(core.ears._speech_gate(), 1) if core.ears else None,
         "last_transcript": getattr(core.ears, "last_transcript", ""),
         "last_wake_match": getattr(core.ears, "last_wake_match", False),
+        "busy": core.busy,
+        "voice_error": core.voice.error,
+        "voice_active": core.voice.active,
+        "last_command_source": core.last_command_source,
+        "last_reply_seconds": core.last_reply_seconds,
+        "last_command_error": core.last_command_error,
+        "brain_ready": bool(core.brain.codex and core.brain.codex.loaded),
+        "brain_first_delta_seconds": core.brain.codex.first_delta_seconds if core.brain.codex else None,
         "state": core.state,
     }
 

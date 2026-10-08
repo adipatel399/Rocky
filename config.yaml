@@ -34,7 +34,7 @@ ears:
   mic_gain: 1.5           # software mic boost; raise to 2–3 if he still misses you
   followup_seconds: 8     # conversation mode: after each reply he keeps
                           # listening this long — no wake word between turns
-  silence_seconds: 1.4    # pause length that ends your sentence
+  silence_seconds: 0.8    # shorter pause before speech recognition starts
   max_command_seconds: 14
   whisper_model: "base.en"   # tiny.en = fastest · small.en = most accurate
 
@@ -51,6 +51,8 @@ sleep_phrases:
 brain:
   provider: "codex"        # ChatGPT account through Codex CLI; "claude" optional
   command: "codex"         # also auto-detects the bundled macOS app CLI
+  transport: "app-server"  # persistent process + token streaming; "exec" fallback
+  reasoning_effort: "low"  # quicker spoken answers; increase for harder tasks
   model: null              # null = Codex default; use a model your account supports
   cwd: null                # null = this Rocky project directory
   sandbox: "workspace-write" # read-only / workspace-write / danger-full-access

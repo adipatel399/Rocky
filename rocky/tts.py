@@ -6,6 +6,7 @@ generating. A worker task speaks sentences sequentially through macOS `say`
 (instant, offline). The voice is chosen live from the HUD dropdown.
 """
 import asyncio
+import logging
 import re
 
 CODE_BLOCK = re.compile(r"```.*?```", re.DOTALL)
@@ -34,6 +35,7 @@ class Voice:
         self.active = 0               # queued + currently-speaking count
         self.worker = None
         self._stopped = False
+        self.error = None
 
     @property
     def enabled(self) -> bool:
@@ -92,13 +94,20 @@ class Voice:
                     "-r", str(self.cfg.get("rate", 180)),
                     stdin=asyncio.subprocess.PIPE,
                     stdout=asyncio.subprocess.DEVNULL,
-                    stderr=asyncio.subprocess.DEVNULL,
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 try:
-                    await self.proc.communicate(text.encode("utf-8"))
+                    _, stderr = await self.proc.communicate(text.encode("utf-8"))
+                    if self.proc.returncode and not self._stopped:
+                        raise RuntimeError(stderr.decode("utf-8", "replace").strip()
+                                           or f"macOS say exited {self.proc.returncode}")
+                    self.error = None
                 except asyncio.CancelledError:
                     self._kill_current()
                     raise
+            except Exception as e:
+                self.error = str(e)
+                logging.exception("Rocky speech playback failed")
             finally:
                 self.active -= 1
                 self.queue.task_done()
@@ -117,12 +126,14 @@ class Voice:
         clean = strip_for_speech(text)
         if not self.enabled or not clean:
             return
-        subprocess.run(
+        result = subprocess.run(
             ["say", "-v", str(self.cfg.get("name", "Rocko (English (US))")),
              "-r", str(self.cfg.get("rate", 180))],
             input=clean.encode("utf-8"),
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
         )
+        self.error = (result.stderr.decode("utf-8", "replace").strip()
+                      or f"macOS say exited {result.returncode}") if result.returncode else None
 
     def stop(self):
         """Cut speech now and drop everything queued."""
