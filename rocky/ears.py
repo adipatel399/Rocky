@@ -15,6 +15,7 @@ v3 fixes and behavior:
   echo, and wake-model state is reset after busy periods.
 """
 import asyncio
+import collections
 import os
 import random
 import re
@@ -37,6 +38,9 @@ class Ears(threading.Thread):
         self.ready = False
         self.error = None
         self.peak_score = 0.0  # recent best wake score — visible in /api/stats for tuning
+        self.mic_rms = 0.0
+        self.last_transcript = ""
+        self.last_wake_match = False
         self.gain = float(self.ecfg.get("mic_gain", 1.5))
         self._noise_floor = 60.0
         self.wake_word = str(self.ecfg.get("wake_word", "rocky")).lower()
@@ -98,7 +102,17 @@ class Ears(threading.Thread):
             pcm = self.np.clip(pcm.astype(self.np.int32) * self.gain,
                                -32768, 32767).astype(self.np.int16)
         rms = float(self.np.sqrt(self.np.mean(pcm.astype(self.np.float64) ** 2)) + 1e-9)
+        self.mic_rms = round(rms, 1)
         return pcm, rms
+
+    def _speech_gate(self):
+        return max(2.5 * self._noise_floor,
+                   float(self.ecfg.get("min_speech_rms", 180)))
+
+    def _calibrate_noise(self, rms):
+        # Never teach the silence estimator a loud speech frame.
+        if rms < self._speech_gate():
+            self._noise_floor = 0.98 * self._noise_floor + 0.02 * rms
 
     def _flush_input(self):
         """Discard buffered audio (e.g. Rocky's own voice while he spoke)."""
@@ -115,28 +129,39 @@ class Ears(threading.Thread):
         and only wake if it begins with the wake word. The rest of the sentence
         becomes the first command, so "Rocky, what's the weather" works in one
         breath. No cloud, no extra model — reuses Whisper."""
+        ring = collections.deque(maxlen=PREROLL_FRAMES)
+        was_busy = False
         while True:
             try:
                 if self.muted or self.core.state != "idle":
+                    was_busy = True
                     time.sleep(0.05)
                     continue
+                if was_busy:
+                    self._flush_input()
+                    ring.clear()
+                    was_busy = False
                 pcm, rms = self._read_frame()
-                self._noise_floor = 0.98 * self._noise_floor + 0.02 * rms
-                gate = max(2.5 * self._noise_floor, 250)
+                ring.append(pcm)
+                gate = self._speech_gate()
                 if rms <= gate:
+                    self._calibrate_noise(rms)
                     continue  # silence — keep listening cheaply (no Whisper)
 
-                audio = self._record_utterance(pcm)
+                audio = self._record_utterance(self.np.concatenate(list(ring)))
+                ring.clear()
                 text = self._transcribe(audio)
                 if not text:
                     self._set_state("idle")
                     continue
                 matched, remainder = self._wake_match(text)
+                self.last_wake_match = matched
                 self.peak_score = 1.0 if matched else 0.0
                 if not matched:
                     self._set_state("idle")
                     continue
                 self._converse_whisper(remainder)
+                was_busy = True
             except Exception as e:
                 self._notify_system(f"Ears recovered from an error: {e}")
                 self._set_state("idle")
@@ -163,7 +188,7 @@ class Ears(threading.Thread):
         np = self.np
         silence_limit = float(self.ecfg.get("silence_seconds", 1.4))
         max_seconds = float(self.ecfg.get("max_command_seconds", 14))
-        gate = max(2.5 * self._noise_floor, 250)
+        gate = self._speech_gate()
         self._set_state("listening")
         chunks = [preroll]
         silent = 0.0
@@ -287,7 +312,7 @@ class Ears(threading.Thread):
         np = self.np
         silence_limit = float(self.ecfg.get("silence_seconds", 1.4))
         max_seconds = float(self.ecfg.get("max_command_seconds", 14))
-        gate = max(2.5 * self._noise_floor, 250)
+        gate = self._speech_gate()
 
         # Phase 1 — wait for speech onset, keeping a short pre-roll ring.
         ring = []
@@ -334,7 +359,9 @@ class Ears(threading.Thread):
         self._set_state("thinking")
         segments, _ = self.whisper.transcribe(audio, language="en",
                                               beam_size=1, vad_filter=True)
-        return " ".join(s.text.strip() for s in segments).strip()
+        text = " ".join(s.text.strip() for s in segments).strip()
+        self.last_transcript = text
+        return text
 
     # ---------- bridge to the event loop ----------
 

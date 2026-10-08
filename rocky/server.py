@@ -372,6 +372,11 @@ async def stats():
         "ears": bool(core.ears and core.ears.ready and core.ears.is_alive()),
         "ears_error": getattr(core.ears, "error", None) if core.ears else "disabled",
         "wake_peak": round(getattr(core.ears, "peak_score", 0.0), 3),
+        "ears_muted": bool(core.ears and core.ears.muted),
+        "mic_rms": getattr(core.ears, "mic_rms", 0.0),
+        "speech_gate": round(core.ears._speech_gate(), 1) if core.ears else None,
+        "last_transcript": getattr(core.ears, "last_transcript", ""),
+        "last_wake_match": getattr(core.ears, "last_wake_match", False),
         "state": core.state,
     }
 
