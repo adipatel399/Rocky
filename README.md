@@ -75,7 +75,9 @@ flowchart TB
 **In plain English:**
 - **Ears** — always listening quietly for "Rocky," transcribing offline with Whisper and only waking on a match. Say the wake word and the rest of your sentence in one go — he splits off the command automatically.
 - **Brain** — Codex uses your saved ChatGPT login through a persistent app-server process warmed at startup. Requests share Rocky's own conversation, and individual text tokens stream to the HUD; NEW starts fresh. Low reasoning effort is the default for faster voice replies. This is a separate conversation from the ChatGPT/Codex app chat.
-- **Voice** — macOS `say` speaks each sentence as streaming text completes it. Voice commands receive a short acknowledgment while the brain starts working. Backend errors are also spoken, and playback failures appear in `/api/stats`. Pick any installed voice live from the HUD dropdown.
+- **Voice** — macOS `say` speaks each sentence as streaming text completes it. A bare “Hey Rocky” gets an acknowledgment and opens follow-up listening. “Hey Rocky, weather in Surat” goes directly to the task without an extra acknowledgment. Backend errors are also spoken, and playback failures appear in `/api/stats`. Pick any installed voice live from the HUD dropdown.
+
+Globe focus and the latest result windows are restored when the HUD reconnects or reloads during the same server run. Weather and location displays use the local provider router, without a Codex round-trip. Closing a result window removes it from the restored state.
 - **HUD** — the glowing display: the conversation, an always-on photoreal globe, the little Rocky floating in the corner, and a side panel for diagrams, plans, and images.
 - **His memory** — notes, records, and a thumbnail gallery in plain files on your Mac, so they survive restarts and you can open them yourself anytime.
 

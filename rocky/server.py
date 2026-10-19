@@ -44,6 +44,7 @@ class RockyCore:
         self.current_task = None
         self.busy = False
         self.last_globe = None
+        self.last_windows = collections.OrderedDict()
         self.started_at = time.time()
         self.last_command_source = None
         self.last_reply_seconds = None
@@ -52,6 +53,18 @@ class RockyCore:
     # ---------- broadcasting ----------
 
     async def broadcast(self, payload: dict):
+        kind = payload.get('type')
+        if kind == 'globe':
+            self.last_globe = dict(payload)
+        elif kind == 'window':
+            payload.setdefault('id', f'panel-{time.monotonic_ns()}')
+            self.last_windows[payload['id']] = dict(payload)
+            while len(self.last_windows) > 12:
+                self.last_windows.popitem(last=False)
+        elif kind == 'window_update' and payload.get('id') in self.last_windows:
+            self.last_windows[payload['id']].update(payload.get('patch') or {})
+        elif kind == 'ui' and payload.get('action') == 'close' and self.last_windows:
+            self.last_windows.popitem()
         dead = []
         for ws in self.clients:
             try:
@@ -97,9 +110,6 @@ class RockyCore:
         await self.set_state("thinking")
 
         try:
-            if source == "voice":
-                await self.voice.speak("Yes, friend.")
-                await self.set_state("thinking")
             # --- Geospatial fast path: geocode + live data, no LLM round-trip.
             if await self._try_geo(text):
                 return
@@ -195,8 +205,12 @@ class RockyCore:
 
     async def wake_test(self):
         import random
+        if self.busy:
+            return
         await self.set_state("listening")
-        await self.voice.speak(random.choice(self.cfg["acknowledgements"]))
+        acknowledgment = random.choice(self.cfg['acknowledgements'])
+        await self.post_message('rocky', acknowledgment)
+        await self.voice.speak(acknowledgment)
         await self.voice.wait_idle()
         await self.set_state("idle")
 
@@ -211,6 +225,8 @@ class RockyCore:
             "type": "init",
             "state": self.state,
             "history": list(self.history),
+            "globe": self.last_globe,
+            "windows": list(self.last_windows.values()),
             "ears": bool(self.ears and self.ears.ready and self.ears.is_alive()),
             "voice": self.cfg["voice"].get("name", "Rocko"),
             "voice_label": self._voice_label(),
@@ -391,6 +407,8 @@ async def ws_endpoint(ws: WebSocket):
                     payload = _artifact_payload(path)
                     if payload:
                         await ws.send_json(payload)
+            elif mtype == 'dismiss_window':
+                core.last_windows.pop(data.get('id'), None)
     except WebSocketDisconnect:
         core.clients.discard(ws)
 

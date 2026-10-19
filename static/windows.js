@@ -79,6 +79,7 @@ const WM = (() => {
   }
 
   function close(rec) {
+    if (rec.wid && window.send) window.send({ type: 'dismiss_window', id: rec.wid });
     rec.el.classList.remove("show");
     setTimeout(() => rec.el.remove(), 200);
     const i = wins.indexOf(rec); if (i >= 0) wins.splice(i, 1);
@@ -276,5 +277,11 @@ const WM = (() => {
     }
   }
 
-  return { open: openWrapped, action, update };
+  function reset() {
+    wins.forEach(w => { w.el.remove(); if (w.dockChip) w.dockChip.remove(); });
+    wins.length = 0;
+    activeId = null;
+  }
+
+  return { open: openWrapped, action, update, reset };
 })();

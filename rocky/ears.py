@@ -175,7 +175,7 @@ class Ears(threading.Thread):
         words = list(re.finditer(r"[a-z']+", text.lower()))
         if not words:
             return False, ""
-        variants = {self.wake_word, "rocky", "rock", "rockie", "rocco", "ricky", "rocketh"}
+        variants = {self.wake_word, "rocky", "rockey", "rocki", "roki", "rock", "rockie", "rocco", "ricky", "rocketh"}
         for i in range(min(2, len(words))):
             w = words[i].group()
             if w in variants or w.startswith("rock"):
@@ -215,10 +215,10 @@ class Ears(threading.Thread):
         """After the wake word: run the first command (if any) then keep the
         conversation open, no wake word needed, until silence or a sleep phrase."""
         followup = float(self.ecfg.get("followup_seconds", 8))
-        if remainder and len(remainder) >= 2:
+        if remainder:
             self._run_command(remainder)          # "Rocky, <command>" in one breath
         else:
-            self.core.voice.speak_blocking(random.choice(self.cfg["acknowledgements"]))
+            self._acknowledge()
         while True:
             self._set_state("listening")
             self._flush_input()
@@ -231,8 +231,17 @@ class Ears(threading.Thread):
                 self._notify_user(text)
                 self.core.voice.speak_blocking("Good. Sleep now, friend.")
                 break
-            self._run_command(text)
+            matched, command = self._wake_match(text)
+            if matched and not command:
+                self._acknowledge()
+                continue
+            self._run_command(command if matched else text)
         self._set_state("idle")
+
+    def _acknowledge(self):
+        # Share the normal interruptible speech queue and UI history.
+        future = asyncio.run_coroutine_threadsafe(self.core.wake_test(), self.loop)
+        future.result(timeout=30)
 
     def _run_command(self, text: str):
         future = asyncio.run_coroutine_threadsafe(

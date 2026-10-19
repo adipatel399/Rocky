@@ -88,6 +88,7 @@ const GlobeStage = (() => {
     if (!ready) { init().then(() => show(m)); return; }
     const controls = world.controls();
     if (m.action === "spin") {
+      controls.autoRotate = true;
       seq++;  // cancel any in-flight fly sequence
       world.htmlElementsData([]).ringsData([]);
       controls.autoRotateSpeed = 1.1;
@@ -103,6 +104,7 @@ const GlobeStage = (() => {
     const my = ++seq;
     const controls = world.controls();
     controls.autoRotateSpeed = 0.08;
+    controls.autoRotate = true;
     labelEl.textContent = label;
     world.ringsData([]).htmlElementsData([]);
     const cur = world.pointOfView();
@@ -124,5 +126,10 @@ const GlobeStage = (() => {
     world.pointOfView({ altitude: 2.4 }, 1000);
   }
 
-  return { init, show, toggle };
+  function status() {
+    return { ready, rotating: !!(world && world.controls().autoRotate),
+      position: world ? world.pointOfView() : null };
+  }
+
+  return { init, show, toggle, status };
 })();

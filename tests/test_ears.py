@@ -38,8 +38,28 @@ class WakeDetectionTests(unittest.TestCase):
 
     def test_both_wake_phrases(self):
         ears = self.ears()
-        for phrase in ('Rocky.', 'Hey Rocky!'):
+        for phrase in ('Rocky.', 'Hey Rocky!', 'Hey Rockey!'):
             self.assertEqual(ears._wake_match(phrase), (True, ''))
+
+    def test_wake_with_task_skips_ack_and_runs_task(self):
+        ears = self.ears()
+        with patch.object(ears, '_acknowledge') as ack, \
+             patch.object(ears, '_run_command') as run, \
+             patch.object(ears, '_record', return_value=None), \
+             patch.object(ears, '_set_state'), patch.object(ears, '_flush_input'):
+            ears._converse_whisper('weather in Surat')
+        ack.assert_not_called()
+        run.assert_called_once_with('weather in Surat')
+
+    def test_bare_wake_only_acknowledges(self):
+        ears = self.ears()
+        with patch.object(ears, '_acknowledge') as ack, \
+             patch.object(ears, '_run_command') as run, \
+             patch.object(ears, '_record', return_value=None), \
+             patch.object(ears, '_set_state'), patch.object(ears, '_flush_input'):
+            ears._converse_whisper('')
+        ack.assert_called_once()
+        run.assert_not_called()
 
     def test_command_preserves_numbers_and_punctuation(self):
         ears = self.ears()

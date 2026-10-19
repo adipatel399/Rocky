@@ -407,6 +407,9 @@ function connect() {
         buildVoiceMenu(m.voices, m.voice);
         feedEl.innerHTML = ""; liveMsg = null;
         (m.history || []).forEach(h => addMsg(h.role, h.text));
+        WM.reset();
+        if (m.globe) GlobeStage.show(m.globe);
+        (m.windows || []).forEach(w => WM.open(w));
         break;
       case "voice":
         { const sel = document.getElementById("voice-select");
@@ -459,7 +462,6 @@ function earsUI(on) {
   const el = document.getElementById("t-ears");
   el.textContent = on ? "ONLINE" : "OFFLINE"; el.className = "v" + (on ? "" : " off");
 }
-connect();
 
 /* ================= status ================= */
 const STATUS = { idle: "STANDING BY", listening: "LISTENING", thinking: "THINKING", speaking: "TALKING" };
@@ -568,10 +570,11 @@ setInterval(pollStats, 4000); pollStats();
 </script>
 
 <script src="/static/rocky.js?b=9"></script>
-<script src="/static/windows.js?b=4"></script>
-<script src="/static/globe.js?b=6"></script>
+<script src="/static/windows.js?b=5"></script>
+<script src="/static/globe.js?b=7"></script>
 <script>
   RockyChar.create(document.getElementById("rocky-corner-canvas"), { spin: true, interactive: true });
   RockyChar.create(document.getElementById("reactor"), { mini: true });
   GlobeStage.init();
+  connect();
 </script>
