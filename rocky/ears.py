@@ -41,6 +41,12 @@ class Ears(threading.Thread):
         self.mic_rms = 0.0
         self.last_transcript = ""
         self.last_wake_match = False
+        self.recordings = 0
+        self.last_audio_seconds = 0.0
+        self.last_audio_rms = 0.0
+        self.last_speech_seconds = None
+        self.last_asr_fallback = False
+        self.input_device_name = None
         self.gain = float(self.ecfg.get("mic_gain", 1.5))
         self._noise_floor = 60.0
         self.wake_word = str(self.ecfg.get("wake_word", "rocky")).lower()
@@ -77,7 +83,9 @@ class Ears(threading.Thread):
                                         device="cpu", compute_type="int8")
             self.np = np
 
-            self.stream = sd.InputStream(samplerate=SAMPLE_RATE, channels=1,
+            device = self.ecfg.get('input_device')
+            self.input_device_name = sd.query_devices(device, 'input')['name']
+            self.stream = sd.InputStream(device=device, samplerate=SAMPLE_RATE, channels=1,
                                          dtype="int16", blocksize=FRAME)
             self.stream.start()
         except Exception as e:
@@ -151,7 +159,7 @@ class Ears(threading.Thread):
 
                 audio = self._record_utterance(self.np.concatenate(list(ring)))
                 ring.clear()
-                text = self._transcribe(audio)
+                text = self._transcribe(audio, wake=True)
                 if not text:
                     self._set_state("idle")
                     continue
@@ -367,13 +375,28 @@ class Ears(threading.Thread):
             return None
         return audio
 
-    def _transcribe(self, audio) -> str:
+    def _transcribe(self, audio, wake=False) -> str:
         if audio is None or len(audio) < SAMPLE_RATE // 4:
             return ""
         self._set_state("thinking")
-        segments, _ = self.whisper.transcribe(audio, language="en",
-                                              beam_size=1, vad_filter=True)
+        self.recordings += 1
+        self.last_audio_seconds = round(len(audio) / SAMPLE_RATE, 2)
+        self.last_audio_rms = round(float(self.np.sqrt(self.np.mean(audio ** 2))), 5)
+        self.last_asr_fallback = False
+        segments, info = self.whisper.transcribe(audio, language="en",
+                    beam_size=1, vad_filter=True, condition_on_previous_text=False)
         text = " ".join(s.text.strip() for s in segments).strip()
+        self.last_speech_seconds = round(getattr(info, 'duration_after_vad', 0.0), 2)
+        if wake and not text:
+            # VAD can erase short/quiet wake phrases. Retry the SAME captured
+            # audio once; only a valid wake match may ever reach the brain.
+            self.last_asr_fallback = True
+            segments, _ = self.whisper.transcribe(audio, language='en', beam_size=1,
+                    vad_filter=False, condition_on_previous_text=False)
+            candidate = ' '.join(s.text.strip() for s in segments).strip()
+            # Unfiltered decoding of noise can hallucinate long sentences.
+            # Only retain this retry when it actually contains a wake phrase.
+            text = candidate if self._wake_match(candidate)[0] else ''
         self.last_transcript = text
         return text
 

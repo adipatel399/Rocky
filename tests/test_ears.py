@@ -1,6 +1,6 @@
 import unittest
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 
 import numpy as np
 
@@ -73,6 +73,41 @@ class WakeDetectionTests(unittest.TestCase):
         for _ in range(1000):
             ears._calibrate_noise(ears._speech_gate() - 1)
         self.assertLessEqual(ears._noise_floor, 120)
+
+    def test_empty_vad_result_retries_same_wake_audio(self):
+        ears = self.ears()
+        audio = np.full(16000, .02, dtype=np.float32)
+        ears.whisper = SimpleNamespace(transcribe=Mock(side_effect=[
+            ([], SimpleNamespace(duration_after_vad=0)),
+            ([SimpleNamespace(text='Hey Rocky, weather in Surat')], SimpleNamespace())]))
+        with patch.object(ears, '_set_state'):
+            text = ears._transcribe(audio, wake=True)
+        self.assertTrue(ears.last_asr_fallback)
+        self.assertEqual(ears.last_speech_seconds, 0)
+        self.assertEqual(ears._wake_match(text), (True, 'weather in Surat'))
+        calls = ears.whisper.transcribe.call_args_list
+        self.assertIs(calls[0].args[0], calls[1].args[0])
+        self.assertTrue(calls[0].kwargs['vad_filter'])
+        self.assertFalse(calls[1].kwargs['vad_filter'])
+
+    def test_retry_does_not_make_unrelated_words_a_wake_command(self):
+        ears = self.ears()
+        ears.whisper = SimpleNamespace(transcribe=Mock(side_effect=[
+            ([], SimpleNamespace(duration_after_vad=0)),
+            ([SimpleNamespace(text='Thank you.')], SimpleNamespace())]))
+        with patch.object(ears, '_set_state'):
+            text = ears._transcribe(np.full(16000, .02, dtype=np.float32), wake=True)
+        self.assertEqual(text, '')
+        self.assertEqual(ears._wake_match(text), (False, ''))
+
+    def test_successful_vad_transcription_is_not_repeated(self):
+        ears = self.ears()
+        ears.whisper = SimpleNamespace(transcribe=Mock(return_value=(
+            [SimpleNamespace(text='Hey Rocky')], SimpleNamespace(duration_after_vad=.5))))
+        with patch.object(ears, '_set_state'):
+            self.assertEqual(ears._transcribe(np.full(16000, .02, dtype=np.float32), wake=True), 'Hey Rocky')
+        ears.whisper.transcribe.assert_called_once()
+        self.assertFalse(ears.last_asr_fallback)
 
 
 if __name__ == '__main__':

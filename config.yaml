@@ -25,6 +25,7 @@ port: 8765
 
 ears:
   enabled: true
+  input_device: "MacBook Pro Microphone" # pin input; avoid automatic Continuity mic switches
   wake_word: "rocky"      # say "Rocky" or "Hey Rocky" to wake him
   wake_engine: "whisper"  # "whisper" = spot the wake word with speech-to-text
                           # (works for any word); "openwakeword" = fast "Jarvis" model
@@ -34,7 +35,7 @@ ears:
   mic_gain: 1.5           # software mic boost; raise to 2–3 if he still misses you
   followup_seconds: 8     # conversation mode: after each reply he keeps
                           # listening this long — no wake word between turns
-  silence_seconds: 0.8    # shorter pause before speech recognition starts
+  silence_seconds: 1.4    # original pause tolerance; avoid clipping natural speech
   max_command_seconds: 14
   whisper_model: "base.en"   # tiny.en = fastest · small.en = most accurate
 
