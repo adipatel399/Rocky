@@ -22,6 +22,25 @@ sys.exit(0 if valid else 1)
 ' "$DIR"
 }
 
+server_ready() {
+  curl -fsS --max-time 2 "$URL/api/stats" 2>/dev/null | "$DIR/.venv/bin/python" -c '
+import json, sys
+try:
+    info = json.load(sys.stdin)
+except ValueError:
+    sys.exit(1)
+if info.get("startup_error"):
+    print("ROCKY NOT READY: " + info["startup_error"])
+    sys.exit(2)
+if not info.get("ready"):
+    sys.exit(1)
+if info.get("ears_muted") or info.get("ears_error") or info.get("voice_error"):
+    print("ROCKY NOT READY: " + (info.get("ears_error") or info.get("voice_error") or "Microphone is muted; click UNMUTE."))
+    sys.exit(2)
+print("ROCKY READY — microphone, AI reply, and speech checks passed.")
+'
+}
+
 open_window() {
   if [[ -x "$CHROME" ]]; then
     open -na "Google Chrome" --args --app="$URL" --window-size=1500,920
@@ -45,11 +64,20 @@ case "$1" in
     exit 0 ;;
   logs)
     exec tail -f "$DIR/data/rocky.log" ;;
+  check)
+    if ! server_matches_project; then
+      echo "ROCKY is not running from this project."
+      exit 1
+    fi
+    server_ready
+    ready_code=$?
+    [[ $ready_code == 1 ]] && echo "ROCKY is still starting — wait for the ready announcement."
+    exit $ready_code ;;
 esac
 
 # Already awake? Just bring up the window.
 if server_matches_project; then
-  echo "ROCKY is already awake — opening his window."
+  server_ready || echo "ROCKY server is running; check readiness with rocky check."
   open_window
   exit 0
 fi
@@ -65,9 +93,17 @@ mkdir -p data
 
 # Open the window as soon as the server answers.
 ( for i in {1..60}; do
-    server_matches_project && { open_window; exit 0; }
+    server_matches_project && { open_window; break; }
     sleep 0.5
-  done ) &
+  done
+  for i in {1..120}; do
+    server_ready
+    ready_code=$?
+    [[ $ready_code == 0 || $ready_code == 2 ]] && exit $ready_code
+    sleep 0.5
+  done
+  echo "ROCKY has not passed startup checks. Run rocky check before presenting."
+) &
 
-echo "ROCKY online. This terminal is his lifeline — close it (or Ctrl+C) to power him down."
+echo "ROCKY STARTING — wait for the ready announcement before speaking. Ctrl+C stops him."
 .venv/bin/python -m rocky 2>&1 | tee -a data/rocky.log

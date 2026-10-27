@@ -160,6 +160,8 @@ class Ears(threading.Thread):
                 self.peak_score = 1.0 if matched else 0.0
                 if not matched:
                     self._set_state("idle")
+                    asyncio.run_coroutine_threadsafe(self.core.broadcast({
+                        'type': 'heard', 'text': text, 'matched': False}), self.loop)
                     continue
                 self._converse_whisper(remainder)
                 was_busy = True

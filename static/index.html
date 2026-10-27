@@ -411,6 +411,9 @@ function connect() {
         if (m.globe) GlobeStage.show(m.globe);
         (m.windows || []).forEach(w => WM.open(w));
         break;
+      case 'heard':
+        if (!m.matched && S.state === 'idle') sub(`Heard “${m.text}” — say “Hey Rocky” to wake`);
+        break;
       case "voice":
         { const sel = document.getElementById("voice-select");
           if (sel && m.name) sel.value = m.name; }
@@ -464,8 +467,8 @@ function earsUI(on) {
 }
 
 /* ================= status ================= */
-const STATUS = { idle: "STANDING BY", listening: "LISTENING", thinking: "THINKING", speaking: "TALKING" };
-const HINTS = { idle: "say “Rocky” — or just type", listening: "talk, friend — Rocky listen", thinking: "Rocky work…", speaking: "" };
+const STATUS = { starting: 'STARTING — PLEASE WAIT', error: 'STARTUP CHECK FAILED', idle: "STANDING BY", listening: "LISTENING", thinking: "THINKING", speaking: "TALKING" };
+const HINTS = { starting: 'Checking microphone, AI connection, and speech…', error: 'See the message below or run rocky check', idle: "say “Rocky” — or just type", listening: "talk, friend — Rocky listen", thinking: "Rocky work…", speaking: "" };
 function setState(s) { S.state = s; RockyChar.setState(s); document.getElementById("status").textContent = STATUS[s] || s.toUpperCase(); sub(HINTS[s] ?? ""); }
 function sub(t) { document.getElementById("substatus").textContent = t; }
 

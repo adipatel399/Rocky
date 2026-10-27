@@ -4,11 +4,35 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from rocky.config import load
-from rocky.server import RockyCore, stats
+from rocky.server import RockyCore, stats, _prepare_startup
 from rocky.tts import Voice
 
 
 class PipelineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_startup_requires_successful_ai_and_microphone_checks(self):
+        core = self.core()
+        core.voice.error = None
+        core.brain.warmup = AsyncMock()
+        core.brain.ask = AsyncMock(return_value='READY')
+        core.ears = SimpleNamespace(ready=True, error=None, is_alive=lambda: True)
+        with patch('rocky.server.core', core):
+            await _prepare_startup()
+        self.assertTrue(core.startup_ready)
+        self.assertEqual(core.state, 'idle')
+        core.voice.speak.assert_awaited_once_with('Rocky ready, friend.')
+
+    async def test_failed_ai_check_never_announces_ready(self):
+        core = self.core()
+        core.voice.error = None
+        core.brain.warmup = AsyncMock()
+        core.brain.ask = AsyncMock(return_value='ChatGPT login needs attention.')
+        with patch('rocky.server.core', core):
+            await _prepare_startup()
+        self.assertFalse(core.startup_ready)
+        self.assertEqual(core.state, 'error')
+        self.assertIn('login', core.startup_error)
+        core.voice.speak.assert_not_awaited()
+
     async def test_runtime_identity_identifies_checkout_and_backend(self):
         from rocky.config import ROOT
         result = await stats()

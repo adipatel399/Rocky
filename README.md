@@ -231,6 +231,8 @@ Voice diagnostics in `/api/stats` include `mic_rms`, `speech_gate`, `last_transc
 
 If an old Rocky checkout is still running on port 8765, this launcher refuses to silently reuse it. `/api/stats` identifies the running `project_root`, `brain_provider`, and `brain_transport`. Stop the old copy from its own terminal before launching the maintained checkout. A Claude OAuth error while expecting ChatGPT can indicate an older checkout is running, rather than a problem with the ChatGPT login.
 
+Before a presentation, launch Rocky and wait for **“Rocky ready, friend.”** Startup now checks a real AI reply, microphone initialization, and speech playback before reporting READY. `rocky check` (or `./bin/rocky check`) confirms those checks passed; a startup error is shown instead of a false ready message. This checks the microphone stream, not recognition of your particular voice: try “Hey Rocky” once before beginning. If speech is captured but the wake phrase is missed, the HUD shows what it heard.
+
 If the brain reports a login error, run `codex login`, choose ChatGPT, and press NEW in the HUD. If it reports a usage limit, wait for your Codex allowance to reset. If ears are offline, check `/api/stats` for `ears_error`, install all requirements, and restart; the voice model may take time to load on first start.
 
 ---

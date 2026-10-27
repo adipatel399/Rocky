@@ -49,6 +49,8 @@ class RockyCore:
         self.last_command_source = None
         self.last_reply_seconds = None
         self.last_command_error = None
+        self.startup_ready = False
+        self.startup_error = None
 
     # ---------- broadcasting ----------
 
@@ -224,6 +226,8 @@ class RockyCore:
         return {
             "type": "init",
             "state": self.state,
+            "ready": self.startup_ready,
+            "startup_error": self.startup_error,
             "history": list(self.history),
             "globe": self.last_globe,
             "windows": list(self.last_windows.values()),
@@ -330,7 +334,7 @@ def _read_globe(path: str):
 
 @app.on_event("startup")
 async def startup():
-    asyncio.ensure_future(core.brain.warmup())
+    await core.set_state('starting')
     if cfg["ears"].get("enabled", True):
         try:
             _start_ears(asyncio.get_event_loop())
@@ -338,7 +342,38 @@ async def startup():
             print(f"[rocky] ears disabled: {e}")
         asyncio.ensure_future(_watchdog())
     asyncio.ensure_future(_watch_data())
-    print(f"[rocky] HUD → http://localhost:{cfg['port']}")
+    asyncio.ensure_future(_prepare_startup())
+    print(f"[rocky] Starting microphone and AI checks → http://localhost:{cfg['port']}", flush=True)
+
+
+async def _prepare_startup():
+    try:
+        await core.brain.warmup()
+        # A loaded thread alone does not verify authentication or warm inference.
+        reply = await asyncio.wait_for(core.brain.ask(
+            'Startup connection check. Reply exactly READY and nothing else. Do not use tools.'), 45)
+        if reply.strip() != 'READY':
+            raise RuntimeError(f'AI connection check failed: {reply}')
+        if cfg['ears'].get('enabled', True):
+            deadline = time.monotonic() + 45
+            while not (core.ears and core.ears.ready and core.ears.is_alive()):
+                if core.ears and core.ears.error:
+                    raise RuntimeError(core.ears.error)
+                if time.monotonic() > deadline:
+                    raise RuntimeError('Microphone initialization timed out.')
+                await asyncio.sleep(0.1)
+        await core.voice.speak('Rocky ready, friend.')
+        await core.voice.wait_idle()
+        if core.voice.error:
+            raise RuntimeError(core.voice.error)
+        core.startup_ready = True
+        await core.set_state('idle')
+        print('[rocky] READY — microphone, AI reply, and speech checks passed.', flush=True)
+    except Exception as e:
+        core.startup_error = str(e)
+        await core.post_message('system', f'Rocky is not ready: {e}')
+        await core.set_state('error')
+        print(f'[rocky] NOT READY: {e}', flush=True)
 
 
 @app.on_event('shutdown')
@@ -380,11 +415,15 @@ async def ws_endpoint(ws: WebSocket):
             data = await ws.receive_json()
             mtype = data.get("type")
             if mtype == "command":
-                asyncio.ensure_future(core.handle_command(data.get("text", ""), "text"))
+                if not core.startup_ready:
+                    await core.post_message('system', core.startup_error or 'Still starting, friend. Wait for Rocky ready.')
+                else:
+                    asyncio.ensure_future(core.handle_command(data.get("text", ""), "text"))
             elif mtype == "interrupt":
                 core.interrupt()
             elif mtype == "wake":
-                asyncio.ensure_future(core.wake_test())
+                if core.startup_ready:
+                    asyncio.ensure_future(core.wake_test())
             elif mtype == "mute_ears" and core.ears:
                 core.ears.muted = bool(data.get("value"))
                 await core.post_message(
@@ -419,6 +458,8 @@ async def ws_endpoint(ws: WebSocket):
 async def stats():
     return {
         "app": "rocky",
+        "ready": core.startup_ready,
+        "startup_error": core.startup_error,
         "project_root": config_mod.ROOT,
         "brain_provider": cfg['brain'].get('provider', 'codex'),
         "brain_transport": cfg['brain'].get('transport', 'app-server'),
