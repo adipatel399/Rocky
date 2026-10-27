@@ -4,11 +4,18 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from rocky.config import load
-from rocky.server import RockyCore
+from rocky.server import RockyCore, stats
 from rocky.tts import Voice
 
 
 class PipelineTests(unittest.IsolatedAsyncioTestCase):
+    async def test_runtime_identity_identifies_checkout_and_backend(self):
+        from rocky.config import ROOT
+        result = await stats()
+        self.assertEqual(result['app'], 'rocky')
+        self.assertEqual(result['project_root'], ROOT)
+        self.assertEqual(result['brain_provider'], load()['brain']['provider'])
+
     def core(self):
         core = RockyCore(load())
         core.voice = SimpleNamespace(speak=AsyncMock(), wait_idle=AsyncMock(),

@@ -9,6 +9,19 @@ DIR="$(cd "$(dirname "$0")/.." && pwd)"   # project root (bin/..)
 URL="http://localhost:8765"
 CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
 
+server_matches_project() {
+  curl -fsS --max-time 2 "$URL/api/stats" 2>/dev/null | "$DIR/.venv/bin/python" -c '
+import json, os, sys
+try:
+    info = json.load(sys.stdin)
+    expected = os.path.realpath(sys.argv[1])
+    valid = info.get("app") == "rocky" and os.path.realpath(info.get("project_root", "")) == expected
+except (ValueError, OSError):
+    valid = False
+sys.exit(0 if valid else 1)
+' "$DIR"
+}
+
 open_window() {
   if [[ -x "$CHROME" ]]; then
     open -na "Google Chrome" --args --app="$URL" --window-size=1500,920
@@ -21,6 +34,10 @@ case "$1" in
   stop)
     PID=$(lsof -ti :8765 -sTCP:LISTEN)
     if [[ -n "$PID" ]]; then
+      if ! server_matches_project; then
+        echo "Port 8765 belongs to another or outdated app. Stop that copy from its own terminal first."
+        exit 1
+      fi
       kill $PID && echo "ROCKY powered down."
     else
       echo "ROCKY wasn't running."
@@ -31,10 +48,16 @@ case "$1" in
 esac
 
 # Already awake? Just bring up the window.
-if curl -s -o /dev/null --max-time 1 "$URL/api/stats"; then
+if server_matches_project; then
   echo "ROCKY is already awake — opening his window."
   open_window
   exit 0
+fi
+
+if lsof -ti :8765 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "Another app or outdated Rocky copy is using port 8765."
+  echo "Stop it from its own terminal, then run this launcher again: $DIR/bin/rocky"
+  exit 1
 fi
 
 cd "$DIR" || exit 1
@@ -42,7 +65,7 @@ mkdir -p data
 
 # Open the window as soon as the server answers.
 ( for i in {1..60}; do
-    curl -s -o /dev/null --max-time 1 "$URL/api/stats" && { open_window; exit 0; }
+    server_matches_project && { open_window; exit 0; }
     sleep 0.5
   done ) &
 

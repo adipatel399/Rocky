@@ -418,6 +418,10 @@ async def ws_endpoint(ws: WebSocket):
 @app.get("/api/stats")
 async def stats():
     return {
+        "app": "rocky",
+        "project_root": config_mod.ROOT,
+        "brain_provider": cfg['brain'].get('provider', 'codex'),
+        "brain_transport": cfg['brain'].get('transport', 'app-server'),
         "load": round(os.getloadavg()[0], 2),
         "uptime": int(time.time() - core.started_at),
         "ears": bool(core.ears and core.ears.ready and core.ears.is_alive()),

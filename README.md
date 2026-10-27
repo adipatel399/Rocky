@@ -229,6 +229,8 @@ Codex runs without interactive terminal approval prompts. Its default workspace 
 
 Voice diagnostics in `/api/stats` include `mic_rms`, `speech_gate`, `last_transcript`, `last_wake_match`, `voice_error`, `last_command_error`, `brain_ready`, and `brain_first_delta_seconds`. Wake parsing preserves numbers and punctuation. End-of-question silence defaults to 0.8 seconds; increase it if Rocky cuts you off. Cloud/model latency still varies; first-token timing excludes microphone capture and playback.
 
+If an old Rocky checkout is still running on port 8765, this launcher refuses to silently reuse it. `/api/stats` identifies the running `project_root`, `brain_provider`, and `brain_transport`. Stop the old copy from its own terminal before launching the maintained checkout. A Claude OAuth error while expecting ChatGPT can indicate an older checkout is running, rather than a problem with the ChatGPT login.
+
 If the brain reports a login error, run `codex login`, choose ChatGPT, and press NEW in the HUD. If it reports a usage limit, wait for your Codex allowance to reset. If ears are offline, check `/api/stats` for `ears_error`, install all requirements, and restart; the voice model may take time to load on first start.
 
 ---
